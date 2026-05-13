@@ -101,11 +101,15 @@ export default class EventCache {
 
     private revalidating = false;
 
+    private pendingUpdates = new Set<string>();
+
     generateId(): string {
         return `${this.pkCounter++}`;
     }
 
     private updateViewCallbacks: UpdateViewCallback[] = [];
+
+    private fileLocks = new Map<string, Promise<void>>();
 
     initialized = false;
 
@@ -314,37 +318,44 @@ export default class EventCache {
             throw new Error(`Cannot add event to a read-only calendar`);
         }
         const location = await calendar.createEvent(event);
-        const id = this.store.add({
-            calendar,
-            location,
-            id: event.id || this.generateId(),
-            event,
-        });
-
-        const [type, ...rest] = calendarId.split("::");
-        const identifier = rest.join("::");
-        const source = this.calendarInfos.find((s: any) => {
-            if (s.type !== type) return false;
-            if (s.type === "local") return s.directory === identifier;
-            if (s.type === "dailynote") return s.heading === identifier;
-            return false;
-        });
-
-        if (
-            source?.syncToDailyNote &&
-            (event.type === "single" || event.type === "recurring") &&
-            event.completed !== null &&
-            event.completed !== undefined
-        ) {
-            await appendTaskToDailyNote(
-                this.app,
+        this.pendingUpdates.add(location.file.path);
+        try {
+            const id = this.store.add({
+                calendar,
+                location,
+                id: event.id || this.generateId(),
                 event,
-                source.dailyNoteFormat,
-                source.dailyNoteHeading
-            );
-        }
+            });
 
-        this.updateViews([], [{ event, id, calendarId: calendar.id }]);
+            const [type, ...rest] = calendarId.split("::");
+            const identifier = rest.join("::");
+            const source = this.calendarInfos.find((s: any) => {
+                if (s.type !== type) return false;
+                if (s.type === "local") return s.directory === identifier;
+                if (s.type === "dailynote") return s.heading === identifier;
+                return false;
+            });
+
+            if (
+                source?.syncToDailyNote &&
+                (event.type === "single" || event.type === "recurring") &&
+                event.completed !== null &&
+                event.completed !== undefined
+            ) {
+                await appendTaskToDailyNote(
+                    this.app,
+                    event,
+                    source.dailyNoteFormat,
+                    source.dailyNoteHeading
+                );
+            }
+
+            this.updateViews([], [{ event, id, calendarId: calendar.id }]);
+        } finally {
+            setTimeout(() => {
+                this.pendingUpdates.delete(location.file.path);
+            }, 1000);
+        }
         return true;
     }
 
@@ -355,29 +366,36 @@ export default class EventCache {
     async deleteEvent(eventId: string): Promise<void> {
         const event = this.store.getEventById(eventId);
         const { calendar, location } = this.getInfoForEditableEvent(eventId);
-        this.store.delete(eventId);
-        await calendar.deleteEvent(location);
+        this.pendingUpdates.add(location.path);
+        try {
+            this.store.delete(eventId);
+            await calendar.deleteEvent(location);
 
-        if (event) {
-            const [type, ...rest] = calendar.id.split("::");
-            const identifier = rest.join("::");
-            const source = this.calendarInfos.find((s: any) => {
-                if (s.type !== type) return false;
-                if (s.type === "local") return s.directory === identifier;
-                if (s.type === "dailynote") return s.heading === identifier;
-                return false;
-            });
+            if (event) {
+                const [type, ...rest] = calendar.id.split("::");
+                const identifier = rest.join("::");
+                const source = this.calendarInfos.find((s: any) => {
+                    if (s.type !== type) return false;
+                    if (s.type === "local") return s.directory === identifier;
+                    if (s.type === "dailynote") return s.heading === identifier;
+                    return false;
+                });
 
-            if (source?.syncToDailyNote) {
-                await removeTaskFromDailyNote(
-                    this.app,
-                    event,
-                    source.dailyNoteFormat
-                );
+                if (source?.syncToDailyNote) {
+                    await removeTaskFromDailyNote(
+                        this.app,
+                        event,
+                        source.dailyNoteFormat
+                    );
+                }
             }
-        }
 
-        this.updateViews([eventId], []);
+            this.updateViews([eventId], []);
+        } finally {
+            setTimeout(() => {
+                this.pendingUpdates.delete(location.path);
+            }, 1000);
+        }
     }
 
     /**
@@ -397,19 +415,31 @@ export default class EventCache {
 
         const oldEvent = this.store.getEventById(eventId);
 
-        await calendar.modifyEvent(
-            { path, lineNumber },
-            newEvent,
-            (newLocation) => {
-                this.store.delete(eventId);
-                this.store.add({
-                    calendar,
-                    location: newLocation,
-                    id: eventId,
-                    event: newEvent,
-                });
-            }
-        );
+        this.pendingUpdates.add(path);
+        try {
+            await calendar.modifyEvent(
+                { path, lineNumber },
+                newEvent,
+                (newLocation) => {
+                    this.pendingUpdates.add(newLocation.file.path);
+                    this.store.delete(eventId);
+                    this.store.add({
+                        calendar,
+                        location: newLocation,
+                        id: eventId,
+                        event: newEvent,
+                    });
+                }
+            );
+        } finally {
+            setTimeout(() => {
+                this.pendingUpdates.delete(path);
+                const newInfo = this.store.getEventDetails(eventId);
+                if (newInfo && newInfo.location) {
+                    this.pendingUpdates.delete(newInfo.location.path);
+                }
+            }, 1000);
+        }
 
         const [type, ...rest] = calendar.id.split("::");
         const identifier = rest.join("::");
@@ -521,15 +551,27 @@ export default class EventCache {
             );
         }
 
-        await oldCalendar.move(location, newCalendar, (newLocation) => {
-            this.store.delete(eventId);
-            this.store.add({
-                calendar: newCalendar,
-                location: newLocation,
-                id: eventId,
-                event,
+        this.pendingUpdates.add(location.path);
+        try {
+            await oldCalendar.move(location, newCalendar, (newLocation) => {
+                this.pendingUpdates.add(newLocation.file.path);
+                this.store.delete(eventId);
+                this.store.add({
+                    calendar: newCalendar,
+                    location: newLocation,
+                    id: eventId,
+                    event,
+                });
             });
-        });
+        } finally {
+            setTimeout(() => {
+                this.pendingUpdates.delete(location.path);
+                const newInfo = this.store.getEventDetails(eventId);
+                if (newInfo && newInfo.location) {
+                    this.pendingUpdates.delete(newInfo.location.path);
+                }
+            }, 1000);
+        }
     }
 
     ///
@@ -545,13 +587,67 @@ export default class EventCache {
     }
 
     /**
+     * Update the path of all events stored in a given file.
+     * @param oldPath Old path of file
+     * @param file New file object
+     */
+    async fileMoved(oldPath: string, file: TFile): Promise<void> {
+        this.store.renamePath(oldPath, file.path);
+        await this.fileUpdated(file);
+    }
+
+    /**
      * Main hook into the filesystem.
      * This callback should be called whenever a file has been updated or created.
      * @param file File which has been updated
      * @returns nothing
      */
     async fileUpdated(file: TFile): Promise<void> {
+        const lock = this.fileLocks.get(file.path) || Promise.resolve();
+        const newLock = lock
+            .then(async () => {
+                await this._fileUpdated(file);
+            })
+            .catch((err) => {
+                console.error("Error in fileUpdated:", err);
+            });
+        this.fileLocks.set(file.path, newLock);
+        return newLock;
+    }
+
+    private async _fileUpdated(file: TFile): Promise<void> {
+        if (this.pendingUpdates.has(file.path)) {
+            console.debug(
+                "skipping fileUpdated because of pending manual update",
+                file.path
+            );
+            return;
+        }
         console.debug("fileUpdated() called for file", file.path);
+        if (file.extension && file.extension !== "md") {
+            return;
+        }
+
+        // Wait for metadata to be available if it's not already.
+        let metadata = this.app.metadataCache?.getFileCache(file);
+        if (this.app.metadataCache && !metadata) {
+            await new Promise<void>((resolve) => {
+                const eventRef = this.app.metadataCache.on(
+                    "changed",
+                    (changedFile) => {
+                        if (changedFile.path === file.path) {
+                            this.app.metadataCache.offref(eventRef);
+                            resolve();
+                        }
+                    }
+                );
+                // Safety timeout
+                setTimeout(() => {
+                    this.app.metadataCache.offref(eventRef);
+                    resolve();
+                }, 1000);
+            });
+        }
 
         // Get all calendars that contain events stored in this file.
         const calendars = [...this.calendars.values()].flatMap((c) =>
@@ -599,12 +695,17 @@ export default class EventCache {
                 newEvents
             );
 
-            const newEventsWithIds = newEvents.map(([event, location]) => ({
-                event,
-                id: event.id || this.generateId(),
-                location,
-                calendarId: calendar.id,
-            }));
+            const newEventsWithIds = newEvents.map(([event, location]) => {
+                const oldMatch = oldEvents.find(
+                    (oe) => oe.event.title === event.title
+                );
+                return {
+                    event,
+                    id: event.id || oldMatch?.id || this.generateId(),
+                    location,
+                    calendarId: calendar.id,
+                };
+            });
 
             // If events have changed in the calendar, then remove all the old events from the store and add in new ones.
             const oldIds = oldEvents.map((r: StoredEvent) => r.id);

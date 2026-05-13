@@ -327,36 +327,42 @@ export class CalendarView extends ItemView {
                     toRemove,
                     toAdd,
                 });
-                toRemove.forEach((id) => {
-                    let event = this.fullCalendarView?.getEventById(id);
-                    while (event) {
-                        console.debug("removing event", event.toPlainObject());
-                        event.remove();
-                        event = this.fullCalendarView?.getEventById(id);
-                    }
-                });
-                toAdd.forEach(({ id, event, calendarId }) => {
-                    const eventInput = toEventInput(id, event);
-                    if (!eventInput) return;
-
-                    // Double check if event already exists to prevent ghosts
-                    let existingEvent = this.fullCalendarView?.getEventById(id);
-                    while (existingEvent) {
-                        console.warn(`Ghost event detected for ID ${id}, removing before re-add.`);
-                        existingEvent.remove();
-                        existingEvent = this.fullCalendarView?.getEventById(id);
-                    }
-
-                    console.debug("adding event", {
-                        id,
-                        event,
-                        eventInput,
-                        calendarId,
+                this.fullCalendarView?.batchRendering(() => {
+                    toRemove.forEach((id) => {
+                        let event = this.fullCalendarView?.getEventById(id);
+                        while (event) {
+                            console.debug(
+                                "removing event",
+                                event.toPlainObject()
+                            );
+                            event.remove();
+                            event = this.fullCalendarView?.getEventById(id);
+                        }
                     });
-                    this.fullCalendarView?.addEvent(
-                        eventInput,
-                        calendarId
-                    );
+                    toAdd.forEach(({ id, event, calendarId }) => {
+                        const eventInput = toEventInput(id, event);
+                        if (!eventInput) return;
+
+                        // Double check if event already exists to prevent ghosts
+                        let existingEvent =
+                            this.fullCalendarView?.getEventById(id);
+                        while (existingEvent) {
+                            console.warn(
+                                `Ghost event detected for ID ${id}, removing before re-add.`
+                            );
+                            existingEvent.remove();
+                            existingEvent =
+                                this.fullCalendarView?.getEventById(id);
+                        }
+
+                        console.debug("adding event", {
+                            id,
+                            event,
+                            eventInput,
+                            calendarId,
+                        });
+                        this.fullCalendarView?.addEvent(eventInput, calendarId);
+                    });
                 });
             } else if (payload.type == "calendar") {
                 const {

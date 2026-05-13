@@ -71,10 +71,18 @@ class OneToMany<T extends Identifier, FK extends Identifier> {
     renameKey(oldKey: T, newKey: T) {
         const related = this.related.get(oldKey.id);
         if (!related) {
-            throw new Error(`Key does not exist in map: ${related}`);
+            return;
         }
         this.related.delete(oldKey.id);
-        this.related.set(newKey.id, related);
+        let newRelated = this.related.get(newKey.id);
+        if (!newRelated) {
+            newRelated = new Set();
+            this.related.set(newKey.id, newRelated);
+        }
+        for (const manyId of related) {
+            newRelated.add(manyId);
+            this.foreign.set(manyId, newKey.id);
+        }
     }
 
     get numEntries(): number {
@@ -216,7 +224,7 @@ export default class EventStore {
             const { file, lineNumber } = location;
             console.debug("adding event in file:", file.path);
             this.pathIndex.add(new Path(file), new EventID(id));
-            if (lineNumber) {
+            if (lineNumber !== undefined) {
                 this.lineNumbers.set(id, lineNumber);
             }
         }
@@ -252,6 +260,10 @@ export default class EventStore {
         const eventIds = this.calendarIndex.getBy(calendar);
         eventIds.forEach((id) => this.delete(id));
         return eventIds;
+    }
+
+    renamePath(oldPath: string, newPath: string) {
+        this.pathIndex.renameKey(new Path({ path: oldPath }), new Path({ path: newPath }));
     }
 
     getEventById(id: string): OFCEvent | null {

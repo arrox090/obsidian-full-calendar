@@ -266,7 +266,7 @@ export default class DailyNoteCalendar extends EditableCalendar {
         const metadata = await this.app.waitForMetadata(file);
 
         const headingInfo = metadata.headings?.find(
-            (h) => h.heading == this.heading
+            (h) => h.heading.trim() == this.heading.trim()
         );
         if (!headingInfo) {
             throw new Error(
@@ -348,7 +348,7 @@ export default class DailyNoteCalendar extends EditableCalendar {
                 throw new Error("No metadata for file " + file.path);
             }
             const headingInfo = metadata.headings?.find(
-                (h) => h.heading == this.heading
+                (h) => h.heading.trim() == this.heading.trim()
             );
             if (!headingInfo) {
                 throw new Error(

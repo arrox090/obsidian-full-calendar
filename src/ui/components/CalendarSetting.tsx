@@ -232,12 +232,14 @@ export const CalendarSettingRow = ({
                                     !dailyNoteHeading &&
                                     availableHeadings.length > 0
                                 ) {
-                                    updates.dailyNoteHeading = availableHeadings[0];
+                                    updates.dailyNoteHeading =
+                                        availableHeadings[0];
                                 }
                                 updateCalendar(updates);
                             }}
                             style={{ marginRight: "6px" }}
-                        />                        Save to Daily Note
+                        />{" "}
+                        Save to Daily Note
                     </label>
                 )}
 

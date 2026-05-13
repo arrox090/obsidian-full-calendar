@@ -85,7 +85,9 @@ export const EditEvent = ({
     );
 
     const [isTask, setIsTask] = useState(
-        initialEvent && (initialEvent as any).completed !== undefined
+        initialEvent &&
+            (initialEvent as any).completed !== undefined &&
+            (initialEvent as any).completed !== null
             ? true
             : (calendars[defaultCalendarIndex] as any)?.isTaskByDefault || false
     );
@@ -135,7 +137,11 @@ export const EditEvent = ({
                           recurrence: recurrenceString,
                           startRecur: date || undefined,
                           endRecur: endRecur || undefined,
-                          completed: isTask ? (initialEvent?.type === 'recurring' ? initialEvent.completed : false) : null,
+                          completed: isTask
+                              ? initialEvent?.type === "recurring"
+                                  ? initialEvent.completed
+                                  : false
+                              : null,
                       }
                     : {
                           type: "single",

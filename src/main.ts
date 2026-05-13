@@ -78,14 +78,16 @@ export default class FullCalendarPlugin extends Plugin {
         await new Promise((resolve) => setTimeout(resolve, 500));
 
         for (const source of allEvents) {
-            const calendarSource = this.settings.calendarSources.find((s: any) => {
-                const [type, ...rest] = source.id.split("::");
-                const identifier = rest.join("::");
-                if (s.type !== type) return false;
-                if (s.type === "local") return s.directory === identifier;
-                if (s.type === "dailynote") return s.heading === identifier;
-                return false;
-            });
+            const calendarSource = this.settings.calendarSources.find(
+                (s: any) => {
+                    const [type, ...rest] = source.id.split("::");
+                    const identifier = rest.join("::");
+                    if (s.type !== type) return false;
+                    if (s.type === "local") return s.directory === identifier;
+                    if (s.type === "dailynote") return s.heading === identifier;
+                    return false;
+                }
+            );
 
             if (calendarSource?.syncToDailyNote) {
                 for (const cachedEvent of source.events) {
@@ -114,7 +116,9 @@ export default class FullCalendarPlugin extends Plugin {
                                       ).toJSDate()
                                     : undefined,
                             });
-                            if (rrule.between(jsDate, jsDate, true).length > 0) {
+                            if (
+                                rrule.between(jsDate, jsDate, true).length > 0
+                            ) {
                                 shouldSync = true;
                                 instanceDate = dateStr;
                             }
@@ -169,8 +173,8 @@ export default class FullCalendarPlugin extends Plugin {
         this.registerEvent(
             this.app.vault.on("rename", (file, oldPath) => {
                 if (file instanceof TFile) {
-                    console.debug("FILE RENAMED", file.path);
-                    this.cache.deleteEventsAtPath(oldPath);
+                    console.debug("FILE RENAMED", oldPath, "->", file.path);
+                    this.cache.fileMoved(oldPath, file);
                 }
             })
         );

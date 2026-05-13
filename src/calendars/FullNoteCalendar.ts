@@ -5,15 +5,20 @@ import { ObsidianInterface } from "../ObsidianAdapter";
 import { OFCEvent, EventLocation, validateEvent } from "../types";
 import { EditableCalendar, EditableEventResponse } from "./EditableCalendar";
 
+const sanitizeFilename = (filename: string) =>
+    filename.replace(/[\\/:*?"<>|]/g, "-");
+
 const basenameFromEvent = (event: OFCEvent): string => {
     switch (event.type) {
         case undefined:
         case "single":
-            return `${event.date} ${event.title}`;
+            return sanitizeFilename(`${event.date} ${event.title}`);
         case "recurring":
-            return `(${event.recurrence}) ${event.title}`;
+            return sanitizeFilename(`(${event.recurrence}) ${event.title}`);
         case "rrule":
-            return `(${rrulestr(event.rrule).toText()}) ${event.title}`;
+            return sanitizeFilename(
+                `(${rrulestr(event.rrule).toText()}) ${event.title}`
+            );
     }
 };
 
@@ -170,12 +175,9 @@ export default class FullNoteCalendar extends EditableCalendar {
 
     async getEventsInFile(file: TFile): Promise<EditableEventResponse[]> {
         const metadata = this.app.getMetadata(file);
-        let event = validateEvent(metadata?.frontmatter);
+        const event = validateEvent(metadata?.frontmatter);
         if (!event) {
             return [];
-        }
-        if (!event.title) {
-            event.title = file.basename;
         }
         return [[event, { file, lineNumber: undefined }]];
     }
@@ -237,6 +239,36 @@ export default class FullNoteCalendar extends EditableCalendar {
             throw new Error(
                 `File ${path} either doesn't exist or is a folder.`
             );
+        }
+
+        if (event.type === "single" || event.type === undefined) {
+            const dateMatch = file.basename.match(/^(\d{4}-\d{2}-\d{2})\s*(.*)$/);
+            const currentDate = dateMatch ? dateMatch[1] : null;
+            const currentIdentifier = dateMatch ? dateMatch[2] : file.basename;
+
+            const metadata = this.app.getMetadata(file);
+            const oldTitle = validateEvent(metadata?.frontmatter)?.title;
+
+            if (currentDate === event.date) {
+                // If the filename matches the OLD title, rename it to the NEW title.
+                if (oldTitle && currentIdentifier === sanitizeFilename(oldTitle)) {
+                    const updatedPath = `${file.parent.path}/${event.date} ${sanitizeFilename(event.title)}.md`;
+                    return { file: { path: updatedPath }, lineNumber: undefined };
+                }
+                return { file: { path }, lineNumber: undefined };
+            }
+
+            // For date changes:
+            // 1. If the current filename matches the old title, use the new title.
+            // 2. Otherwise, preserve the current identifier.
+            const newIdentifier =
+                oldTitle && currentIdentifier === sanitizeFilename(oldTitle)
+                    ? event.title
+                    : currentIdentifier || event.title;
+
+            const updatedPath = `${file.parent.path}/${event.date} ${sanitizeFilename(newIdentifier)}.md`;
+            return { file: { path: updatedPath }, lineNumber: undefined };
+
         }
 
         const updatedPath = `${file.parent.path}/${filenameForEvent(event)}`;

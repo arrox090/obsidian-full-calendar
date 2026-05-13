@@ -2,7 +2,6 @@ import { App, TFile } from "obsidian";
 import {
     getDailyNote,
     getAllDailyNotes,
-    createDailyNote,
 } from "obsidian-daily-notes-interface";
 import { OFCEvent } from "../types";
 import moment from "moment";
@@ -97,11 +96,6 @@ export async function appendTaskToDailyNote(
     let dailyNote = getDailyNote(date, dailyNotes) as TFile;
 
     if (!dailyNote) {
-        dailyNote = (await createDailyNote(date)) as TFile;
-    }
-
-    if (!dailyNote) {
-        console.warn(`Could not find or create daily note for date ${dateStr}`);
         return;
     }
 
@@ -117,7 +111,9 @@ export async function appendTaskToDailyNote(
 
     if (headingText) {
         const cache = app.metadataCache.getFileCache(dailyNote as any);
-        const heading = cache?.headings?.find((h) => h.heading === headingText);
+        const heading = cache?.headings?.find(
+            (h) => h.heading.trim() === headingText.trim()
+        );
         let lines = content.split("\n");
 
         if (heading) {
@@ -158,7 +154,9 @@ export async function removeTaskFromDailyNote(
     const content = await app.vault.read(dailyNote);
     const lines = content.split("\n");
 
-    const filteredLines = lines.filter((line) => !matchesTask(line, event, format));
+    const filteredLines = lines.filter(
+        (line) => !matchesTask(line, event, format)
+    );
 
     if (lines.length !== filteredLines.length) {
         console.log(`Removing task "${event.title}" from ${dailyNote.path}`);
@@ -200,11 +198,15 @@ export async function updateTaskInDailyNote(
         const idx = lines.findIndex((l) => matchesTask(l, oldEvent, format));
 
         if (idx !== -1) {
-            console.log(`Updating task "${oldEvent.title}" to "${newEvent.title}" in ${dailyNote.path}`);
+            console.log(
+                `Updating task "${oldEvent.title}" to "${newEvent.title}" in ${dailyNote.path}`
+            );
             lines[idx] = newLine;
             await app.vault.modify(dailyNote, lines.join("\n"));
         } else {
-            console.warn(`Could not find old task line for "${oldEvent.title}", appending new line instead.`);
+            console.warn(
+                `Could not find old task line for "${oldEvent.title}", appending new line instead.`
+            );
             await appendTaskToDailyNote(app, newEvent, format, headingText);
         }
     }
