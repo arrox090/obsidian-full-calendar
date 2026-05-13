@@ -83,6 +83,7 @@ async function assertFailed(func: () => Promise<any>, message: RegExp) {
 describe("event cache with readonly calendar", () => {
     const makeCache = (events: OFCEvent[]) => {
         const cache = new EventCache(
+            {} as any,
             initializerMap((info) => {
                 if (info.type !== "FOR_TEST_ONLY") {
                     return null;
@@ -263,6 +264,7 @@ const assertCacheContentCounts = (
 describe("editable calendars", () => {
     const makeCache = (events: EditableEventResponse[]) => {
         const cache = new EventCache(
+            {} as any,
             initializerMap((info) => {
                 if (info.type !== "FOR_TEST_ONLY") {
                     return null;

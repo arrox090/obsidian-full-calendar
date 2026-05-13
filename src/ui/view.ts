@@ -136,7 +136,14 @@ export class CalendarView extends ItemView {
                             info.event.id
                         );
                     } else {
-                        launchEditModal(this.plugin, info.event.id);
+                        const instanceDate = info.event.start
+                            ? info.event.start.toISOString().split("T")[0]
+                            : undefined;
+                        launchEditModal(
+                            this.plugin,
+                            info.event.id,
+                            instanceDate
+                        );
                     }
                 } catch (e) {
                     if (e instanceof Error) {
@@ -321,29 +328,35 @@ export class CalendarView extends ItemView {
                     toAdd,
                 });
                 toRemove.forEach((id) => {
-                    const event = this.fullCalendarView?.getEventById(id);
-                    if (event) {
+                    let event = this.fullCalendarView?.getEventById(id);
+                    while (event) {
                         console.debug("removing event", event.toPlainObject());
                         event.remove();
-                    } else {
-                        console.warn(
-                            `Event with id=${id} was slated to be removed but does not exist in the calendar.`
-                        );
+                        event = this.fullCalendarView?.getEventById(id);
                     }
                 });
                 toAdd.forEach(({ id, event, calendarId }) => {
                     const eventInput = toEventInput(id, event);
+                    if (!eventInput) return;
+
+                    // Double check if event already exists to prevent ghosts
+                    let existingEvent = this.fullCalendarView?.getEventById(id);
+                    while (existingEvent) {
+                        console.warn(`Ghost event detected for ID ${id}, removing before re-add.`);
+                        existingEvent.remove();
+                        existingEvent = this.fullCalendarView?.getEventById(id);
+                    }
+
                     console.debug("adding event", {
                         id,
                         event,
                         eventInput,
                         calendarId,
                     });
-                    const addedEvent = this.fullCalendarView?.addEvent(
-                        eventInput!,
+                    this.fullCalendarView?.addEvent(
+                        eventInput,
                         calendarId
                     );
-                    console.debug("event that was added", addedEvent);
                 });
             } else if (payload.type == "calendar") {
                 const {

@@ -74,9 +74,12 @@ export const EventSchema = z.discriminatedUnion("type", [
     }),
     z.object({
         type: z.literal("recurring"),
-        daysOfWeek: z.array(z.enum(["U", "M", "T", "W", "R", "F", "S"])),
+        recurrence: z.string(),
         startRecur: ParsedDate.optional(),
         endRecur: ParsedDate.optional(),
+        completed: ParsedDate.or(z.literal(false))
+            .or(z.literal(null))
+            .optional(),
     }),
     z.object({
         type: z.literal("rrule"),

@@ -82,7 +82,7 @@ export const RecurringEvent: Story = () => (
             allDay: false,
             startTime: "12:00",
             endTime: "13:30",
-            daysOfWeek: ["M", "R"],
+            recurrence: "every 2 days",
         }}
     ></EventModal>
 );

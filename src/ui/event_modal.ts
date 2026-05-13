@@ -14,10 +14,17 @@ export function launchCreateModal(
     const calendars = [...plugin.cache.calendars.entries()]
         .filter(([_, cal]) => cal instanceof EditableCalendar)
         .map(([id, cal]) => {
+            const source = plugin.settings.calendarSources.find((s: any) => {
+                if (s.type !== cal.type) return false;
+                if (s.type === "local") return s.directory === cal.identifier;
+                if (s.type === "dailynote") return s.heading === cal.identifier;
+                return false;
+            });
             return {
                 id,
                 type: cal.type,
                 name: cal.name,
+                isTaskByDefault: source?.isTaskByDefault || false,
             };
         });
     new ReactModal(plugin.app, async (closeModal) =>
@@ -41,20 +48,36 @@ export function launchCreateModal(
     ).open();
 }
 
-export function launchEditModal(plugin: FullCalendarPlugin, eventId: string) {
+export function launchEditModal(
+    plugin: FullCalendarPlugin,
+    eventId: string,
+    instanceDate?: string
+) {
     const eventToEdit = plugin.cache.getEventById(eventId);
     if (!eventToEdit) {
         throw new Error("Cannot edit event that doesn't exist.");
     }
+
+    if (instanceDate) {
+        (eventToEdit as any).instanceDate = instanceDate;
+    }
+
     const calId = plugin.cache.getInfoForEditableEvent(eventId).calendar.id;
 
     const calendars = [...plugin.cache.calendars.entries()]
         .filter(([_, cal]) => cal instanceof EditableCalendar)
         .map(([id, cal]) => {
+            const source = plugin.settings.calendarSources.find((s: any) => {
+                if (s.type !== cal.type) return false;
+                if (s.type === "local") return s.directory === cal.identifier;
+                if (s.type === "dailynote") return s.heading === cal.identifier;
+                return false;
+            });
             return {
                 id,
                 type: cal.type,
                 name: cal.name,
+                isTaskByDefault: source?.isTaskByDefault || false,
             };
         });
 

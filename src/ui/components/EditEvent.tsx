@@ -2,6 +2,8 @@ import { DateTime } from "luxon";
 import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { CalendarInfo, OFCEvent } from "../../types";
+import { parseRecurrence } from "../interop";
+import { Notice } from "obsidian";
 
 function makeChangeListener<T>(
     setState: React.Dispatch<React.SetStateAction<T>>,
@@ -9,71 +11,6 @@ function makeChangeListener<T>(
 ): React.ChangeEventHandler<HTMLInputElement | HTMLSelectElement> {
     return (e) => setState(fromString(e.target.value));
 }
-
-interface DayChoiceProps {
-    code: string;
-    label: string;
-    isSelected: boolean;
-    onClick: (code: string) => void;
-}
-const DayChoice = ({ code, label, isSelected, onClick }: DayChoiceProps) => (
-    <button
-        type="button"
-        style={{
-            marginLeft: "0.25rem",
-            marginRight: "0.25rem",
-            padding: "0",
-            backgroundColor: isSelected
-                ? "var(--interactive-accent)"
-                : "var(--interactive-normal)",
-            color: isSelected ? "var(--text-on-accent)" : "var(--text-normal)",
-            borderStyle: "solid",
-            borderWidth: "1px",
-            borderRadius: "50%",
-            width: "25px",
-            height: "25px",
-        }}
-        onClick={() => onClick(code)}
-    >
-        <b>{label[0]}</b>
-    </button>
-);
-
-const DAY_MAP = {
-    U: "Sunday",
-    M: "Monday",
-    T: "Tuesday",
-    W: "Wednesday",
-    R: "Thursday",
-    F: "Friday",
-    S: "Saturday",
-};
-
-const DaySelect = ({
-    value: days,
-    onChange,
-}: {
-    value: string[];
-    onChange: (days: string[]) => void;
-}) => {
-    return (
-        <div>
-            {Object.entries(DAY_MAP).map(([code, label]) => (
-                <DayChoice
-                    key={code}
-                    code={code}
-                    label={label}
-                    isSelected={days.includes(code)}
-                    onClick={() =>
-                        days.includes(code)
-                            ? onChange(days.filter((c) => c !== code))
-                            : onChange([code, ...days])
-                    }
-                />
-            ))}
-        </div>
-    );
-};
 
 interface EditEventProps {
     submit: (frontmatter: OFCEvent, calendarIndex: number) => Promise<void>;
@@ -130,9 +67,9 @@ export const EditEvent = ({
     );
     const [endRecur, setEndRecur] = useState("");
 
-    const [daysOfWeek, setDaysOfWeek] = useState<string[]>(
-        (initialEvent?.type === "recurring" ? initialEvent.daysOfWeek : []) ||
-            []
+    const [recurrenceString, setRecurrenceString] = useState<string>(
+        (initialEvent?.type === "recurring" ? initialEvent.recurrence : "") ||
+            ""
     );
 
     const [allDay, setAllDay] = useState(initialEvent?.allDay || false);
@@ -148,12 +85,25 @@ export const EditEvent = ({
     );
 
     const [isTask, setIsTask] = useState(
-        initialEvent?.type === "single" &&
-            initialEvent.completed !== undefined &&
-            initialEvent.completed !== null
+        initialEvent && (initialEvent as any).completed !== undefined
+            ? true
+            : (calendars[defaultCalendarIndex] as any)?.isTaskByDefault || false
     );
 
+    useEffect(() => {
+        // Only override if it is a new event TODO!
+        if (!initialEvent?.title) {
+            const selectedCalendar = calendars[calendarIndex];
+            if (selectedCalendar) {
+                // @ts-ignore
+                setIsTask(selectedCalendar.isTaskByDefault || false);
+            }
+        }
+    }, [calendarIndex, calendars, initialEvent]);
+
     const titleRef = useRef<HTMLInputElement>(null);
+    const recurrenceRef = useRef<HTMLInputElement>(null);
+
     useEffect(() => {
         if (titleRef.current) {
             titleRef.current.focus();
@@ -162,6 +112,17 @@ export const EditEvent = ({
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
+
+        if (isRecurring && !parseRecurrence(recurrenceString)) {
+            if (recurrenceRef.current) {
+                recurrenceRef.current.setCustomValidity(
+                    "Invalid recurrence pattern. Use 'every week', 'every 2 days', etc."
+                );
+                recurrenceRef.current.reportValidity();
+            }
+            return;
+        }
+
         await submit(
             {
                 ...{ title },
@@ -171,17 +132,10 @@ export const EditEvent = ({
                 ...(isRecurring
                     ? {
                           type: "recurring",
-                          daysOfWeek: daysOfWeek as (
-                              | "U"
-                              | "M"
-                              | "T"
-                              | "W"
-                              | "R"
-                              | "F"
-                              | "S"
-                          )[],
+                          recurrence: recurrenceString,
                           startRecur: date || undefined,
                           endRecur: endRecur || undefined,
+                          completed: isTask ? (initialEvent?.type === 'recurring' ? initialEvent.completed : false) : null,
                       }
                     : {
                           type: "single",
@@ -223,29 +177,24 @@ export const EditEvent = ({
                             parseInt
                         )}
                     >
-                        {calendars
-                            .flatMap((cal) =>
-                                cal.type === "local" || cal.type === "dailynote"
-                                    ? [cal]
-                                    : []
-                            )
-                            .map((cal, idx) => (
-                                <option
-                                    key={idx}
-                                    value={idx}
-                                    disabled={
-                                        !(
-                                            initialEvent?.title === undefined ||
-                                            calendars[calendarIndex].type ===
-                                                cal.type
-                                        )
-                                    }
-                                >
-                                    {cal.type === "local"
-                                        ? cal.name
-                                        : "Daily Note"}
-                                </option>
-                            ))}
+                        {calendars.map((cal, idx) => (
+                            <option
+                                key={idx}
+                                value={idx}
+                                disabled={
+                                    !(
+                                        initialEvent?.title === undefined ||
+                                        calendars[calendarIndex].id === cal.id
+                                    )
+                                }
+                            >
+                                {cal.type === "local"
+                                    ? cal.name
+                                    : cal.type === "dailynote"
+                                    ? "Daily Note"
+                                    : cal.name}
+                            </option>
+                        ))}
                     </select>
                 </p>
                 <p>
@@ -309,10 +258,26 @@ export const EditEvent = ({
 
                 {isRecurring && (
                     <>
-                        <DaySelect
-                            value={daysOfWeek}
-                            onChange={setDaysOfWeek}
-                        />
+                        <p>
+                            <label htmlFor="recurrenceStr">
+                                Pattern (e.g., every 2 days){" "}
+                            </label>
+                            <input
+                                type="text"
+                                id="recurrenceStr"
+                                ref={recurrenceRef}
+                                value={recurrenceString}
+                                placeholder="every week"
+                                required={isRecurring}
+                                onInput={(e) =>
+                                    e.currentTarget.setCustomValidity("")
+                                }
+                                onChange={makeChangeListener(
+                                    setRecurrenceString,
+                                    (x) => x
+                                )}
+                            />
+                        </p>
                         <p>
                             Starts recurring
                             <input
@@ -332,6 +297,23 @@ export const EditEvent = ({
                                     (x) => x
                                 )}
                             />
+                            <button
+                                type="button"
+                                style={{ marginLeft: "10px" }}
+                                onClick={() => {
+                                    const baseDateStr =
+                                        (initialEvent as any)?.instanceDate ||
+                                        date ||
+                                        DateTime.now().toISODate();
+                                    const baseDate =
+                                        DateTime.fromISO(baseDateStr);
+                                    setEndRecur(
+                                        baseDate.plus({ days: 1 }).toISODate()
+                                    );
+                                }}
+                            >
+                                Stop after this
+                            </button>
                         </p>
                     </>
                 )}

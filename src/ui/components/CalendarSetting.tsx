@@ -114,40 +114,173 @@ function Username<T extends Partial<CalendarInfo>>({ source }: BasicProps<T>) {
 
 interface CalendarSettingsProps {
     setting: Partial<CalendarInfo>;
-    onColorChange: (s: string) => void;
+    updateCalendar: (updates: Partial<CalendarInfo>) => void; // Changed from onColorChange
     deleteCalendar: () => void;
+    availableHeadings: string[];
 }
 
 export const CalendarSettingRow = ({
     setting,
-    onColorChange,
+    updateCalendar,
     deleteCalendar,
+    availableHeadings,
 }: CalendarSettingsProps) => {
     const isCalDAV = setting.type === "caldav";
+    const isDailyNote = setting.type === "dailynote";
+
+    // Cast as any to bypass strict TS errors before you update schema.ts
+    const isTaskByDefault = (setting as any).isTaskByDefault || false;
+    const syncToDailyNote = (setting as any).syncToDailyNote || false;
+    const dailyNoteFormat = (setting as any).dailyNoteFormat || "default";
+    const dailyNoteHeading = (setting as any).dailyNoteHeading || "";
+
     return (
-        <div className="setting-item">
-            <button
-                type="button"
-                onClick={deleteCalendar}
-                style={{ maxWidth: "15%" }}
+        <div
+            className="setting-item"
+            style={{
+                flexDirection: "column",
+                alignItems: "flex-start",
+                borderBottom: "1px solid var(--background-modifier-border)",
+                paddingBottom: "12px",
+                marginBottom: "12px",
+            }}
+        >
+            {/* TOP ROW: Standard Settings */}
+            <div
+                style={{
+                    display: "flex",
+                    width: "100%",
+                    alignItems: "center",
+                    marginBottom: "8px",
+                }}
             >
-                ✕
-            </button>
-            {setting.type === "local" ? (
-                <DirectorySetting source={setting} />
-            ) : setting.type === "dailynote" ? (
-                <HeadingSetting source={setting} />
-            ) : (
-                <UrlSetting source={setting} />
-            )}
-            {isCalDAV && <NameSetting source={setting} />}
-            {isCalDAV && <Username source={setting} />}
-            <input
-                style={{ maxWidth: "25%", minWidth: "3rem" }}
-                type="color"
-                value={setting.color}
-                onChange={(e) => onColorChange(e.target.value)}
-            />
+                <button
+                    type="button"
+                    onClick={deleteCalendar}
+                    style={{ maxWidth: "15%" }}
+                >
+                    ✕
+                </button>
+                {setting.type === "local" ? (
+                    <DirectorySetting source={setting} />
+                ) : isDailyNote ? (
+                    <HeadingSetting source={setting} />
+                ) : (
+                    <UrlSetting source={setting} />
+                )}
+                {isCalDAV && <NameSetting source={setting} />}
+                {isCalDAV && <Username source={setting} />}
+                <input
+                    style={{ maxWidth: "25%", minWidth: "3rem" }}
+                    type="color"
+                    value={setting.color}
+                    onChange={(e) => updateCalendar({ color: e.target.value })}
+                />
+            </div>
+
+            {/* BOTTOM ROW: Custom Integration Settings */}
+            <div
+                style={{
+                    display: "flex",
+                    width: "100%",
+                    alignItems: "center",
+                    gap: "15px",
+                    paddingLeft: "15%",
+                }}
+            >
+                {/* 1. Auto-Select Task Notes */}
+                <label
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        fontSize: "0.85em",
+                        cursor: "pointer",
+                    }}
+                >
+                    <input
+                        type="checkbox"
+                        checked={isTaskByDefault}
+                        onChange={(e) =>
+                            updateCalendar({
+                                isTaskByDefault: e.target.checked,
+                            } as any)
+                        }
+                        style={{ marginRight: "6px" }}
+                    />
+                    Auto-select Task
+                </label>
+
+                {/* 2. Sync to Daily Note (Only show if it's NOT a daily note calendar already) */}
+                {!isDailyNote && (
+                    <label
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            fontSize: "0.85em",
+                            cursor: "pointer",
+                        }}
+                    >
+                        <input
+                            type="checkbox"
+                            checked={syncToDailyNote}
+                            onChange={(e) => {
+                                const updates: any = {
+                                    syncToDailyNote: e.target.checked,
+                                };
+                                if (
+                                    e.target.checked &&
+                                    !dailyNoteHeading &&
+                                    availableHeadings.length > 0
+                                ) {
+                                    updates.dailyNoteHeading = availableHeadings[0];
+                                }
+                                updateCalendar(updates);
+                            }}
+                            style={{ marginRight: "6px" }}
+                        />                        Save to Daily Note
+                    </label>
+                )}
+
+                {/* 3. Format Dropdown (Only show if Sync is checked) */}
+                {!isDailyNote && syncToDailyNote && (
+                    <>
+                        <select
+                            value={dailyNoteFormat}
+                            onChange={(e) =>
+                                updateCalendar({
+                                    dailyNoteFormat: e.target.value,
+                                } as any)
+                            }
+                            style={{ fontSize: "0.85em", padding: "2px 4px" }}
+                        >
+                            <option value="default">
+                                Default Format (e.g. - [ ])
+                            </option>
+                            <option value="dayplanner">
+                                Day Planner Format
+                            </option>
+                        </select>
+                        <select
+                            value={dailyNoteHeading}
+                            onChange={(e) =>
+                                updateCalendar({
+                                    dailyNoteHeading: e.target.value,
+                                } as any)
+                            }
+                            style={{ fontSize: "0.85em" }}
+                        >
+                            <option value="" disabled hidden>
+                                Select Heading...
+                            </option>
+                            {availableHeadings.map((h: string) => (
+                                <option key={h} value={h}>
+                                    {h}
+                                </option>
+                            ))}
+                        </select>
+                    </>
+                )}
+            </div>
         </div>
     );
 };
@@ -155,6 +288,7 @@ export const CalendarSettingRow = ({
 interface CalendarSettingProps {
     sources: CalendarInfo[];
     submit: (payload: CalendarInfo[]) => void;
+    availableHeadings: string[];
 }
 type CalendarSettingState = {
     sources: CalendarInfo[];
@@ -183,11 +317,15 @@ export class CalendarSettings extends React.Component<
                     <CalendarSettingRow
                         key={idx}
                         setting={s}
-                        onColorChange={(color) =>
+                        availableHeadings={this.props.availableHeadings}
+                        updateCalendar={(updates: Partial<CalendarInfo>) =>
                             this.setState((state, props) => ({
                                 sources: [
                                     ...state.sources.slice(0, idx),
-                                    { ...state.sources[idx], color },
+                                    {
+                                        ...state.sources[idx],
+                                        ...updates,
+                                    } as CalendarInfo,
                                     ...state.sources.slice(idx + 1),
                                 ],
                                 dirty: true,

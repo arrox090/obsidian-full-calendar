@@ -20,6 +20,10 @@ import { ObsidianInterface } from "../ObsidianAdapter";
 import { OFCEvent, EventLocation, CalendarInfo, validateEvent } from "../types";
 import { EventResponse } from "./Calendar";
 import { EditableCalendar, EditableEventResponse } from "./EditableCalendar";
+import {
+    makeListItem,
+    generateInlineAttributes,
+} from "../core/DailyNoteIntegration";
 
 const DATE_FORMAT = "YYYY-MM-DD";
 
@@ -147,48 +151,6 @@ function getAllInlineEventsFromFile(
 }
 
 // SERIALIZATION
-
-const generateInlineAttributes = (attrs: Record<string, any>): string => {
-    return Object.entries(attrs)
-        .map(([k, v]) => `[${k}:: ${v}]`)
-        .join("  ");
-};
-
-const makeListItem = (
-    data: OFCEvent,
-    whitespacePrefix: string = ""
-): string => {
-    if (data.type !== "single") {
-        throw new Error("Can only pass in single event.");
-    }
-    const { completed, title } = data;
-    const checkbox = (() => {
-        if (completed !== null && completed !== undefined) {
-            return `[${completed ? "x" : " "}]`;
-        }
-        return null;
-    })();
-
-    const attrs: Partial<OFCEvent> = { ...data };
-    delete attrs["completed"];
-    delete attrs["title"];
-    delete attrs["type"];
-    delete attrs["date"];
-
-    for (const key of <(keyof OFCEvent)[]>Object.keys(attrs)) {
-        if (attrs[key] === undefined || attrs[key] === null) {
-            delete attrs[key];
-        }
-    }
-
-    if (!attrs["allDay"]) {
-        delete attrs["allDay"];
-    }
-
-    return `${whitespacePrefix}- ${
-        checkbox || ""
-    } ${title} ${generateInlineAttributes(attrs)}`;
-};
 
 const modifyListItem = (line: string, data: OFCEvent): string | null => {
     const listMatch = line.match(listRegex);

@@ -219,14 +219,12 @@ describe("schema parsing tests", () => {
                     title: "Test",
                     allDay: true,
                     type: "recurring",
-                    daysOfWeek: ["M"],
+                    recurrence: "every week",
                 })
             ).toMatchInlineSnapshot(`
                 {
                   "allDay": true,
-                  "daysOfWeek": [
-                    "M",
-                  ],
+                  "recurrence": "every week",
                   "title": "Test",
                   "type": "recurring",
                 }
@@ -238,15 +236,12 @@ describe("schema parsing tests", () => {
                     title: "Test",
                     allDay: true,
                     type: "recurring",
-                    daysOfWeek: ["M", "W"],
+                    recurrence: "every 3 days",
                 })
             ).toMatchInlineSnapshot(`
                 {
                   "allDay": true,
-                  "daysOfWeek": [
-                    "M",
-                    "W",
-                  ],
+                  "recurrence": "every 3 days",
                   "title": "Test",
                   "type": "recurring",
                 }
@@ -258,15 +253,13 @@ describe("schema parsing tests", () => {
                     title: "Test",
                     allDay: true,
                     type: "recurring",
-                    daysOfWeek: ["M"],
+                    recurrence: "every week",
                     startRecur: "2023-01-05",
                 })
             ).toMatchInlineSnapshot(`
                 {
                   "allDay": true,
-                  "daysOfWeek": [
-                    "M",
-                  ],
+                  "recurrence": "every week",
                   "startRecur": "2023-01-05",
                   "title": "Test",
                   "type": "recurring",
@@ -279,16 +272,14 @@ describe("schema parsing tests", () => {
                     title: "Test",
                     allDay: true,
                     type: "recurring",
-                    daysOfWeek: ["M"],
+                    recurrence: "every week",
                     endRecur: "2023-01-05",
                 })
             ).toMatchInlineSnapshot(`
                 {
                   "allDay": true,
-                  "daysOfWeek": [
-                    "M",
-                  ],
                   "endRecur": "2023-01-05",
+                  "recurrence": "every week",
                   "title": "Test",
                   "type": "recurring",
                 }
@@ -300,17 +291,15 @@ describe("schema parsing tests", () => {
                     title: "Test",
                     allDay: true,
                     type: "recurring",
-                    daysOfWeek: ["M"],
+                    recurrence: "every week",
                     startRecur: "2023-01-05",
                     endRecur: "2023-05-12",
                 })
             ).toMatchInlineSnapshot(`
                 {
                   "allDay": true,
-                  "daysOfWeek": [
-                    "M",
-                  ],
                   "endRecur": "2023-05-12",
+                  "recurrence": "every week",
                   "startRecur": "2023-01-05",
                   "title": "Test",
                   "type": "recurring",

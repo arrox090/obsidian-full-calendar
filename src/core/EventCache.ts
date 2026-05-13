@@ -1,4 +1,4 @@
-import { Notice, TFile } from "obsidian";
+import { App, Notice, TFile } from "obsidian";
 import equal from "deep-equal";
 
 import { Calendar } from "../calendars/Calendar";
@@ -7,6 +7,11 @@ import EventStore, { StoredEvent } from "./EventStore";
 import { CalendarInfo, OFCEvent, validateEvent } from "../types";
 import RemoteCalendar from "../calendars/RemoteCalendar";
 import FullNoteCalendar from "../calendars/FullNoteCalendar";
+import {
+    appendTaskToDailyNote,
+    removeTaskFromDailyNote,
+    updateTaskInDailyNote,
+} from "./DailyNoteIntegration";
 
 export type CalendarInitializerMap = Record<
     CalendarInfo["type"],
@@ -106,7 +111,10 @@ export default class EventCache {
 
     lastRevalidation: number = 0;
 
-    constructor(calendarInitializers: CalendarInitializerMap) {
+    private app: App;
+
+    constructor(app: App, calendarInitializers: CalendarInitializerMap) {
+        this.app = app;
         this.calendarInitializers = calendarInitializers;
     }
 
@@ -313,6 +321,29 @@ export default class EventCache {
             event,
         });
 
+        const [type, ...rest] = calendarId.split("::");
+        const identifier = rest.join("::");
+        const source = this.calendarInfos.find((s: any) => {
+            if (s.type !== type) return false;
+            if (s.type === "local") return s.directory === identifier;
+            if (s.type === "dailynote") return s.heading === identifier;
+            return false;
+        });
+
+        if (
+            source?.syncToDailyNote &&
+            (event.type === "single" || event.type === "recurring") &&
+            event.completed !== null &&
+            event.completed !== undefined
+        ) {
+            await appendTaskToDailyNote(
+                this.app,
+                event,
+                source.dailyNoteFormat,
+                source.dailyNoteHeading
+            );
+        }
+
         this.updateViews([], [{ event, id, calendarId: calendar.id }]);
         return true;
     }
@@ -322,9 +353,30 @@ export default class EventCache {
      * @param eventId ID of event to be deleted.
      */
     async deleteEvent(eventId: string): Promise<void> {
+        const event = this.store.getEventById(eventId);
         const { calendar, location } = this.getInfoForEditableEvent(eventId);
         this.store.delete(eventId);
         await calendar.deleteEvent(location);
+
+        if (event) {
+            const [type, ...rest] = calendar.id.split("::");
+            const identifier = rest.join("::");
+            const source = this.calendarInfos.find((s: any) => {
+                if (s.type !== type) return false;
+                if (s.type === "local") return s.directory === identifier;
+                if (s.type === "dailynote") return s.heading === identifier;
+                return false;
+            });
+
+            if (source?.syncToDailyNote) {
+                await removeTaskFromDailyNote(
+                    this.app,
+                    event,
+                    source.dailyNoteFormat
+                );
+            }
+        }
+
         this.updateViews([eventId], []);
     }
 
@@ -343,6 +395,8 @@ export default class EventCache {
         const { path, lineNumber } = oldLocation;
         console.debug("updating event with ID", eventId);
 
+        const oldEvent = this.store.getEventById(eventId);
+
         await calendar.modifyEvent(
             { path, lineNumber },
             newEvent,
@@ -356,6 +410,51 @@ export default class EventCache {
                 });
             }
         );
+
+        const [type, ...rest] = calendar.id.split("::");
+        const identifier = rest.join("::");
+        const source = this.calendarInfos.find((s: any) => {
+            if (s.type !== type) return false;
+            if (s.type === "local") return s.directory === identifier;
+            if (s.type === "dailynote") return s.heading === identifier;
+            return false;
+        });
+
+        if (source?.syncToDailyNote) {
+            const isNewTask =
+                (newEvent.type === "single" || newEvent.type === "recurring") &&
+                (newEvent as any).completed !== null &&
+                (newEvent as any).completed !== undefined;
+
+            const wasTask =
+                oldEvent &&
+                (oldEvent.type === "single" || oldEvent.type === "recurring") &&
+                (oldEvent as any).completed !== null &&
+                (oldEvent as any).completed !== undefined;
+
+            if (isNewTask && !wasTask) {
+                await appendTaskToDailyNote(
+                    this.app,
+                    newEvent,
+                    source.dailyNoteFormat,
+                    source.dailyNoteHeading
+                );
+            } else if (!isNewTask && wasTask) {
+                await removeTaskFromDailyNote(
+                    this.app,
+                    oldEvent,
+                    source.dailyNoteFormat
+                );
+            } else if (isNewTask && wasTask) {
+                await updateTaskInDailyNote(
+                    this.app,
+                    oldEvent,
+                    newEvent,
+                    source.dailyNoteFormat,
+                    source.dailyNoteHeading
+                );
+            }
+        }
 
         this.updateViews(
             [eventId],

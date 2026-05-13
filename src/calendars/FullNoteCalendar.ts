@@ -11,7 +11,7 @@ const basenameFromEvent = (event: OFCEvent): string => {
         case "single":
             return `${event.date} ${event.title}`;
         case "recurring":
-            return `(Every ${event.daysOfWeek.join(",")}) ${event.title}`;
+            return `(${event.recurrence}) ${event.title}`;
         case "rrule":
             return `(${rrulestr(event.rrule).toText()}) ${event.title}`;
     }

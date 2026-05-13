@@ -2,11 +2,43 @@ import { EventApi, EventInput } from "@fullcalendar/core";
 import { OFCEvent } from "../types";
 
 import { DateTime, Duration } from "luxon";
-import { rrulestr } from "rrule";
+import { rrulestr, RRule } from "rrule";
 
 /*
  * Functions for converting between the types used by the FullCalendar view plugin and types used internally by Obsidian Full Calendar.
  */
+
+export const parseRecurrence = (
+    recurrence: string
+): { freq: number; interval?: number } | null => {
+    const r = recurrence.toLowerCase().trim();
+    // Handles: "every day", "every 2 days", "every week", "every month", etc.
+    const match = r.match(/^every\s+(\d+\s+)?(day|week|month|year)s?$/);
+    if (!match) return null;
+
+    const interval = match[1] ? parseInt(match[1].trim()) : 1;
+    const unit = match[2];
+
+    let freq: number;
+    switch (unit) {
+        case "day":
+            freq = RRule.DAILY;
+            break;
+        case "week":
+            freq = RRule.WEEKLY;
+            break;
+        case "month":
+            freq = RRule.MONTHLY;
+            break;
+        case "year":
+            freq = RRule.YEARLY;
+            break;
+        default:
+            return null;
+    }
+
+    return { freq, interval };
+};
 
 const parseTime = (time: string): Duration | null => {
     let parsed = DateTime.fromFormat(time, "h:mm a");
@@ -112,13 +144,49 @@ export function toEventInput(
         allDay: frontmatter.allDay,
     };
     if (frontmatter.type === "recurring") {
-        event = {
-            ...event,
-            daysOfWeek: frontmatter.daysOfWeek.map((c) => DAYS.indexOf(c)),
-            startRecur: frontmatter.startRecur,
-            endRecur: frontmatter.endRecur,
-            extendedProps: { isTask: false },
-        };
+        const parsed = parseRecurrence(frontmatter.recurrence);
+        if (parsed) {
+            const dtstart = (() => {
+                if (frontmatter.allDay) {
+                    return DateTime.fromISO(frontmatter.startRecur || "");
+                } else {
+                    return DateTime.fromISO(
+                        combineDateTimeStrings(
+                            frontmatter.startRecur || "",
+                            frontmatter.startTime || ""
+                        ) || ""
+                    );
+                }
+            })();
+
+            const rrule = new RRule({
+                freq: parsed.freq,
+                interval: parsed.interval,
+                dtstart: dtstart.toJSDate(),
+                until: frontmatter.endRecur
+                    ? DateTime.fromISO(frontmatter.endRecur).toJSDate()
+                    : undefined,
+            });
+            event = {
+                ...event,
+                rrule: rrule.toString(),
+                extendedProps: {
+                    isTask: false,
+                    recurrence: frontmatter.recurrence,
+                },
+            };
+        } else {
+            event = {
+                ...event,
+                startRecur: frontmatter.startRecur,
+                endRecur: frontmatter.endRecur,
+                extendedProps: {
+                    isTask: false,
+                    // Store your custom natural language string here for the UI to access
+                    recurrence: frontmatter.recurrence,
+                },
+            };
+        }
         if (!frontmatter.allDay) {
             event = {
                 ...event,
@@ -147,12 +215,8 @@ export function toEventInput(
         if (dtstart === null) {
             return null;
         }
-        // NOTE: how exdates are handled does not support events which recur more than once per day.
         const exdate = frontmatter.skipDates
             .map((d) => {
-                // Can't do date arithmetic because timezone might change for different exdates due to DST.
-                // RRule only has one dtstart that doesn't know about DST/timezone changes.
-                // Therefore, just concatenate the date for this exdate and the start time for the event together.
                 const date = DateTime.fromISO(d).toISODate();
                 const time = dtstart.toJSDate().toISOString().split("T")[1];
 
@@ -234,9 +298,13 @@ export function toEventInput(
 }
 
 export function fromEventApi(event: EventApi): OFCEvent {
-    const isRecurring: boolean = event.extendedProps.daysOfWeek !== undefined;
+    // Detect if the event is our new custom recurring type
+    const recurrenceStr = event.extendedProps.recurrence;
+    const isRecurring = recurrenceStr !== undefined;
+
     const startDate = getDate(event.start as Date);
     const endDate = getDate(event.end as Date);
+
     return {
         title: event.title,
         ...(event.allDay
@@ -250,9 +318,7 @@ export function fromEventApi(event: EventApi): OFCEvent {
         ...(isRecurring
             ? {
                   type: "recurring",
-                  daysOfWeek: event.extendedProps.daysOfWeek.map(
-                      (i: number) => DAYS[i]
-                  ),
+                  recurrence: recurrenceStr,
                   startRecur:
                       event.extendedProps.startRecur &&
                       getDate(event.extendedProps.startRecur),
@@ -266,5 +332,5 @@ export function fromEventApi(event: EventApi): OFCEvent {
                   ...(startDate !== endDate ? { endDate } : { endDate: null }),
                   completed: event.extendedProps.taskCompleted,
               }),
-    };
+    } as OFCEvent;
 }

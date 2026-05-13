@@ -260,11 +260,27 @@ export class FullCalendarSettingTab extends PluginSettingTab {
                     .filter((s): s is string => !!s)
         );
 
+        let headings: string[] = [];
+        const { template } = getDailyNoteSettings();
+
+        if (template) {
+            const file = this.app.vault.getAbstractFileByPath(
+                template.endsWith(".md") ? template : template + ".md"
+            );
+            if (file instanceof TFile) {
+                headings =
+                    this.app.metadataCache
+                        .getFileCache(file)
+                        ?.headings?.map((h) => h.heading) || [];
+            }
+        }
+
         const sourcesDiv = containerEl.createDiv();
         sourcesDiv.style.display = "block";
         let sourceList = ReactDOM.render(
             createElement(CalendarSettings, {
                 sources: this.plugin.settings.calendarSources,
+                availableHeadings: headings,
                 submit: async (settings: CalendarInfo[]) => {
                     this.plugin.settings.calendarSources = settings;
                     await this.plugin.saveSettings();

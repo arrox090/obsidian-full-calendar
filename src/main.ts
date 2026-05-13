@@ -1,3 +1,6 @@
+import { rrulestr, RRule } from "rrule";
+import { parseRecurrence } from "./ui/interop";
+import { DateTime } from "luxon";
 import { MarkdownView, Notice, Plugin, TFile } from "obsidian";
 import {
     CalendarView,
@@ -19,10 +22,12 @@ import FullNoteCalendar from "./calendars/FullNoteCalendar";
 import DailyNoteCalendar from "./calendars/DailyNoteCalendar";
 import ICSCalendar from "./calendars/ICSCalendar";
 import CalDAVCalendar from "./calendars/CalDAVCalendar";
+import { appendTaskToDailyNote } from "./core/DailyNoteIntegration";
+import { getDateFromFile } from "obsidian-daily-notes-interface";
 
 export default class FullCalendarPlugin extends Plugin {
     settings: FullCalendarSettings = DEFAULT_SETTINGS;
-    cache: EventCache = new EventCache({
+    cache: EventCache = new EventCache(this.app, {
         local: (info) =>
             info.type === "local"
                 ? new FullNoteCalendar(
@@ -60,6 +65,79 @@ export default class FullCalendarPlugin extends Plugin {
 
     renderCalendar = renderCalendar;
     processFrontmatter = toEventInput;
+
+    async syncTasksToNewDailyNote(file: TFile) {
+        const date = getDateFromFile(file as any, "day");
+        if (!date) return;
+
+        const dateStr = date.format("YYYY-MM-DD");
+        const jsDate = date.toDate();
+        const allEvents = this.cache.getAllEvents();
+
+        // Wait a bit for the file to be fully written/cached by Obsidian
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        for (const source of allEvents) {
+            const calendarSource = this.settings.calendarSources.find((s: any) => {
+                const [type, ...rest] = source.id.split("::");
+                const identifier = rest.join("::");
+                if (s.type !== type) return false;
+                if (s.type === "local") return s.directory === identifier;
+                if (s.type === "dailynote") return s.heading === identifier;
+                return false;
+            });
+
+            if (calendarSource?.syncToDailyNote) {
+                for (const cachedEvent of source.events) {
+                    const { event } = cachedEvent;
+
+                    let shouldSync = false;
+                    let instanceDate = "";
+
+                    if (event.type === "single") {
+                        if (event.date === dateStr) {
+                            shouldSync = true;
+                            instanceDate = event.date;
+                        }
+                    } else if (event.type === "recurring") {
+                        const parsed = parseRecurrence(event.recurrence);
+                        if (parsed) {
+                            const rrule = new RRule({
+                                freq: parsed.freq,
+                                interval: parsed.interval,
+                                dtstart: DateTime.fromISO(
+                                    event.startRecur || ""
+                                ).toJSDate(),
+                                until: event.endRecur
+                                    ? DateTime.fromISO(
+                                          event.endRecur
+                                      ).toJSDate()
+                                    : undefined,
+                            });
+                            if (rrule.between(jsDate, jsDate, true).length > 0) {
+                                shouldSync = true;
+                                instanceDate = dateStr;
+                            }
+                        }
+                    }
+
+                    if (
+                        shouldSync &&
+                        (event as any).completed !== null &&
+                        (event as any).completed !== undefined
+                    ) {
+                        const eventWithInstance = { ...event, instanceDate };
+                        await appendTaskToDailyNote(
+                            this.app,
+                            eventWithInstance,
+                            calendarSource.dailyNoteFormat,
+                            calendarSource.dailyNoteHeading
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     async activateView() {
         const leaves = this.app.workspace
@@ -102,6 +180,14 @@ export default class FullCalendarPlugin extends Plugin {
                 if (file instanceof TFile) {
                     console.debug("FILE DELETED", file.path);
                     this.cache.deleteEventsAtPath(file.path);
+                }
+            })
+        );
+
+        this.registerEvent(
+            this.app.vault.on("create", (file) => {
+                if (file instanceof TFile) {
+                    this.syncTasksToNewDailyNote(file);
                 }
             })
         );
