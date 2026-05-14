@@ -1,6 +1,7 @@
 import "./overrides.css";
 import { ItemView, Menu, Notice, WorkspaceLeaf } from "obsidian";
 import { Calendar, EventSourceInput } from "@fullcalendar/core";
+import { DateTime } from "luxon";
 import { renderCalendar } from "./calendar";
 import FullCalendarPlugin from "../main";
 import { FCError, PLUGIN_SLUG } from "../types";
@@ -55,6 +56,7 @@ export class CalendarView extends ItemView {
     inSidebar: boolean;
     fullCalendarView: Calendar | null = null;
     callback: UpdateViewCallback | null = null;
+    private isNavigating = false;
 
     constructor(
         leaf: WorkspaceLeaf,
@@ -125,26 +127,12 @@ export class CalendarView extends ItemView {
         this.fullCalendarView = renderCalendar(calendarEl, sources, {
             forceNarrow: this.inSidebar,
             eventClick: async (info) => {
+                if (this.isNavigating) return;
                 try {
-                    if (
-                        info.jsEvent.getModifierState("Control") ||
-                        info.jsEvent.getModifierState("Meta")
-                    ) {
-                        await openFileForEvent(
-                            this.plugin.cache,
-                            this.app,
-                            info.event.id
-                        );
-                    } else {
-                        const instanceDate = info.event.start
-                            ? info.event.start.toISOString().split("T")[0]
-                            : undefined;
-                        launchEditModal(
-                            this.plugin,
-                            info.event.id,
-                            instanceDate
-                        );
-                    }
+                    const instanceDate = info.event.start
+                        ? info.event.start.toISOString().split("T")[0]
+                        : undefined;
+                    launchEditModal(this.plugin, info.event.id, instanceDate);
                 } catch (e) {
                     if (e instanceof Error) {
                         console.warn(e);
@@ -152,13 +140,57 @@ export class CalendarView extends ItemView {
                     }
                 }
             },
-            select: async (start, end, allDay, viewType) => {
-                if (viewType === "dayGridMonth") {
-                    // Month view will set the end day to the next day even on a single-day event.
-                    // This is problematic when moving an event created in the month view to the
-                    // time grid to give it a time.
+            dateClick: async (info) => {
+                if (this.isNavigating) return;
+                if (info.view.type === "dayGridMonth") {
+                    this.isNavigating = true;
+                    this.fullCalendarView?.changeView("timeGridDay");
+                    this.fullCalendarView?.gotoDate(info.date);
 
-                    // The fix is just to subtract 1 from the end date before processing.
+                    // Force blur on the entire toolbar to remove focus outlines.
+                    const toolbar =
+                        this.containerEl.querySelector(".fc-header-toolbar");
+                    if (toolbar instanceof HTMLElement) {
+                        (
+                            toolbar.querySelector(
+                                ".fc-button-active"
+                            ) as HTMLElement
+                        )?.blur();
+                        (document.activeElement as HTMLElement)?.blur();
+                    }
+
+                    setTimeout(() => {
+                        this.isNavigating = false;
+                    }, 500);
+                }
+            },
+            dateDblClick: async (info) => {
+                if (this.isNavigating) return;
+                const partialEvent = dateEndpointsToFrontmatter(
+                    info.date,
+                    info.date,
+                    info.allDay
+                );
+                try {
+                    launchCreateModal(this.plugin, partialEvent);
+                } catch (e) {
+                    if (e instanceof Error) {
+                        console.error(e);
+                        new Notice(e.message);
+                    }
+                }
+            },
+            select: async (start, end, allDay, viewType) => {
+                if (this.isNavigating) return;
+                const isSingleDay =
+                    DateTime.fromJSDate(start).toISODate() ===
+                    DateTime.fromJSDate(end).minus({ days: 1 }).toISODate();
+
+                if (viewType === "dayGridMonth" && isSingleDay) {
+                    return; // Handled by dateClick to avoid double-triggering.
+                }
+
+                if (viewType === "dayGridMonth") {
                     end.setDate(end.getDate() - 1);
                 }
                 const partialEvent = dateEndpointsToFrontmatter(
@@ -167,15 +199,34 @@ export class CalendarView extends ItemView {
                     allDay
                 );
                 try {
-                    if (
-                        this.plugin.settings.clickToCreateEventFromMonthView ||
-                        viewType !== "dayGridMonth"
-                    ) {
-                        launchCreateModal(this.plugin, partialEvent);
-                    } else {
-                        this.fullCalendarView?.changeView("timeGridDay");
-                        this.fullCalendarView?.gotoDate(start);
+                    launchCreateModal(this.plugin, partialEvent);
+                } catch (e) {
+                    if (e instanceof Error) {
+                        console.error(e);
+                        new Notice(e.message);
                     }
+                }
+            },
+            selectDblClick: async (start, end, allDay, viewType) => {
+                if (this.isNavigating) return;
+                const isSingleDay =
+                    DateTime.fromJSDate(start).toISODate() ===
+                    DateTime.fromJSDate(end).minus({ days: 1 }).toISODate();
+
+                if (viewType === "dayGridMonth" && isSingleDay) {
+                    return; // Handled by dateDblClick.
+                }
+
+                if (viewType === "dayGridMonth") {
+                    end.setDate(end.getDate() - 1);
+                }
+                const partialEvent = dateEndpointsToFrontmatter(
+                    start,
+                    end,
+                    allDay
+                );
+                try {
+                    launchCreateModal(this.plugin, partialEvent);
                 } catch (e) {
                     if (e instanceof Error) {
                         console.error(e);
@@ -197,23 +248,6 @@ export class CalendarView extends ItemView {
                 }
             },
 
-            eventMouseEnter: async (info) => {
-                try {
-                    const location = this.plugin.cache.getInfoForEditableEvent(
-                        info.event.id
-                    ).location;
-                    if (location) {
-                        this.app.workspace.trigger("hover-link", {
-                            event: info.jsEvent,
-                            source: PLUGIN_SLUG,
-                            hoverParent: calendarEl,
-                            targetEl: info.jsEvent.target,
-                            linktext: location.path,
-                            sourcePath: location.path,
-                        });
-                    }
-                } catch (e) {}
-            },
             firstDay: this.plugin.settings.firstDay,
             initialView: this.plugin.settings.initialView,
             timeFormat24h: this.plugin.settings.timeFormat24h,
