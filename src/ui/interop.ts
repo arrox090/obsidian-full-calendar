@@ -142,6 +142,9 @@ export function toEventInput(
         id,
         title: frontmatter.title,
         allDay: frontmatter.allDay,
+        extendedProps: {
+            description: frontmatter.description,
+        },
     };
     if (frontmatter.type === "recurring") {
         const parsed = parseRecurrence(frontmatter.recurrence);
@@ -171,6 +174,7 @@ export function toEventInput(
                 ...event,
                 rrule: rrule.toString(),
                 extendedProps: {
+                    ...event.extendedProps,
                     isTask: false,
                     recurrence: frontmatter.recurrence,
                 },
@@ -181,6 +185,7 @@ export function toEventInput(
                 startRecur: frontmatter.startRecur,
                 endRecur: frontmatter.endRecur,
                 extendedProps: {
+                    ...event.extendedProps,
                     isTask: false,
                     // Store your custom natural language string here for the UI to access
                     recurrence: frontmatter.recurrence,
@@ -232,6 +237,9 @@ export function toEventInput(
                 dtstart: dtstart.toJSDate(),
             }).toString(),
             exdate,
+            extendedProps: {
+                ...event.extendedProps,
+            },
         };
 
         if (!frontmatter.allDay) {
@@ -273,6 +281,7 @@ export function toEventInput(
                 start,
                 end,
                 extendedProps: {
+                    ...event.extendedProps,
                     isTask:
                         frontmatter.completed !== undefined &&
                         frontmatter.completed !== null,
@@ -285,6 +294,7 @@ export function toEventInput(
                 start: frontmatter.date,
                 end: frontmatter.endDate || undefined,
                 extendedProps: {
+                    ...event.extendedProps,
                     isTask:
                         frontmatter.completed !== undefined &&
                         frontmatter.completed !== null,
@@ -307,6 +317,7 @@ export function fromEventApi(event: EventApi): OFCEvent {
 
     return {
         title: event.title,
+        description: event.extendedProps.description,
         ...(event.allDay
             ? { allDay: true }
             : {

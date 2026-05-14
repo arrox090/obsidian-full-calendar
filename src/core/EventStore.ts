@@ -263,7 +263,10 @@ export default class EventStore {
     }
 
     renamePath(oldPath: string, newPath: string) {
-        this.pathIndex.renameKey(new Path({ path: oldPath }), new Path({ path: newPath }));
+        this.pathIndex.renameKey(
+            new Path({ path: oldPath }),
+            new Path({ path: newPath })
+        );
     }
 
     getEventById(id: string): OFCEvent | null {

@@ -176,6 +176,27 @@ export function renderCalendar(
                 e.preventDefault();
                 openContextMenuForEvent && openContextMenuForEvent(event, e);
             });
+
+            const description = event.extendedProps.description;
+            if (description) {
+                const titleEl =
+                    el.querySelector(".fc-event-title") ||
+                    el.querySelector(".fc-list-event-title");
+                const isDayGrid =
+                    el.closest(".fc-daygrid-event") !== null ||
+                    el.classList.contains("fc-daygrid-event");
+
+                if (titleEl && !isDayGrid) {
+                    const descEl = document.createElement("div");
+                    descEl.addClass("ofc-event-description");
+                    descEl.innerText = description;
+
+                    // In List view, titleEl is often a span or a div that needs to contain the description
+                    // to stay clickable and correctly aligned.
+                    titleEl.appendChild(descEl);
+                }
+            }
+
             if (toggleTask) {
                 if (event.extendedProps.isTask) {
                     const checkbox = document.createElement("input");

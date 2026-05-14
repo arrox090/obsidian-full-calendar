@@ -211,6 +211,44 @@ describe("schema parsing tests", () => {
                 }
             `);
         });
+        it("with description", () => {
+            expect(
+                parseEvent({
+                    title: "Test",
+                    date: "2021-01-01",
+                    allDay: true,
+                    description: "This is a description",
+                })
+            ).toMatchInlineSnapshot(`
+                {
+                  "allDay": true,
+                  "date": "2021-01-01",
+                  "description": "This is a description",
+                  "endDate": null,
+                  "title": "Test",
+                  "type": "single",
+                }
+            `);
+        });
+        it("with desc alias", () => {
+            expect(
+                parseEvent({
+                    title: "Test",
+                    date: "2021-01-01",
+                    allDay: true,
+                    desc: "This is a description",
+                })
+            ).toMatchInlineSnapshot(`
+                {
+                  "allDay": true,
+                  "date": "2021-01-01",
+                  "description": "This is a description",
+                  "endDate": null,
+                  "title": "Test",
+                  "type": "single",
+                }
+            `);
+        });
     });
     describe("simple recurring events", () => {
         it("recurs once per week", () => {

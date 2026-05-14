@@ -1,8 +1,5 @@
 import { App, TFile } from "obsidian";
-import {
-    getDailyNote,
-    getAllDailyNotes,
-} from "obsidian-daily-notes-interface";
+import { getDailyNote, getAllDailyNotes } from "obsidian-daily-notes-interface";
 import { OFCEvent } from "../types";
 import moment from "moment";
 
@@ -10,7 +7,11 @@ export const generateInlineAttributes = (
     attrs: Record<string, any>
 ): string => {
     return Object.entries(attrs)
-        .map(([k, v]) => `[${k}:: ${v}]`)
+        .map(([k, v]) => {
+            const sanitizedValue =
+                typeof v === "string" ? v.replace(/\n/g, " ") : v;
+            return `[${k}:: ${sanitizedValue}]`;
+        })
         .join("  ");
 };
 

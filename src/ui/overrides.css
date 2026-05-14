@@ -71,6 +71,26 @@
 	opacity: 0.8;
 }
 
+/* Titles are bold and larger in Week/Day/List views */
+.fc-timegrid-event .fc-event-title, .fc-list-event-title {
+	font-weight: bold;
+	font-size: 1.1em;
+	line-height: 1.2;
+}
+
+/* Ensure the title container stacks vertically in Week/Day and List views */
+.fc-event-title, .fc-list-event-title {
+	display: flex !important;
+	flex-direction: column !important;
+	align-items: flex-start !important;
+}
+
+/* Smaller time display for contrast */
+.fc-event-time {
+	font-size: 0.8em;
+	opacity: 0.8;
+}
+
 .ofc-checkbox-white {
 	border-color: white !important;
 	border-width: 1px !important;
@@ -79,4 +99,26 @@
 .ofc-checkbox-black {
 	border-color: black !important;
 	border-width: 1px !important;
+}
+
+/* 
+ * Simplified description rendering.
+ * It renders naturally and is clipped by the container's overflow rules.
+ */
+.ofc-event-description {
+	font-size: 0.85em;
+	opacity: 0.7;
+	margin-top: 2px;
+	
+	font-weight: 400 !important;
+	white-space: normal;
+	
+	/* No ellipsis or line-clamping; let it render fully and be cut off by parent */
+	overflow: visible;
+	text-overflow: clip;
+}
+
+/* Ensure container clips descriptions properly */
+.fc-event-main, .fc-list-event-title {
+	overflow: hidden !important;
 }

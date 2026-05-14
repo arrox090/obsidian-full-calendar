@@ -61,6 +61,7 @@ export const TimeSchema = z.discriminatedUnion("allDay", [
 export const CommonSchema = z.object({
     title: z.string(),
     id: z.string().optional(),
+    description: z.string().optional(),
 });
 
 export const EventSchema = z.discriminatedUnion("type", [
@@ -96,10 +97,17 @@ type CommonType = z.infer<typeof CommonSchema>;
 export type OFCEvent = CommonType & TimeType & EventType;
 
 export function parseEvent(obj: unknown): OFCEvent {
-    if (typeof obj !== "object") {
+    if (typeof obj !== "object" || obj === null) {
         throw new Error("value for parsing was not an object.");
     }
-    const objectWithDefaults = { type: "single", allDay: false, ...obj };
+    const anyObj = obj as any;
+    const description = anyObj.description ?? anyObj.desc;
+    const objectWithDefaults = {
+        type: "single",
+        allDay: false,
+        ...anyObj,
+        ...(description !== undefined ? { description } : {}),
+    };
     return {
         ...CommonSchema.parse(objectWithDefaults),
         ...TimeSchema.parse(objectWithDefaults),

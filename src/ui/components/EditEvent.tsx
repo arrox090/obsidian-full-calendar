@@ -62,6 +62,9 @@ export const EditEvent = ({
     const [startTime, setStartTime] = useState(initialStartTime);
     const [endTime, setEndTime] = useState(initialEndTime);
     const [title, setTitle] = useState(initialEvent?.title || "");
+    const [description, setDescription] = useState(
+        initialEvent?.description || ""
+    );
     const [isRecurring, setIsRecurring] = useState(
         initialEvent?.type === "recurring" || false
     );
@@ -127,7 +130,7 @@ export const EditEvent = ({
 
         await submit(
             {
-                ...{ title },
+                ...{ title, description },
                 ...(allDay
                     ? { allDay: true }
                     : { allDay: false, startTime: startTime || "", endTime }),
@@ -172,6 +175,20 @@ export const EditEvent = ({
                         placeholder={"Add title"}
                         required
                         onChange={makeChangeListener(setTitle, (x) => x)}
+                    />
+                </p>
+                <p>
+                    <textarea
+                        id="description"
+                        value={description}
+                        placeholder={"Add description"}
+                        style={{ width: "100%", height: "4em", resize: "none" }}
+                        onChange={(e) =>
+                            setDescription(e.target.value.replace(/\n/g, " "))
+                        }
+                        onBlur={(e) =>
+                            setDescription(e.target.value.replace(/\n/g, " "))
+                        }
                     />
                 </p>
                 <p>
