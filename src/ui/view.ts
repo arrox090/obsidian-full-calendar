@@ -57,6 +57,14 @@ export class CalendarView extends ItemView {
     fullCalendarView: Calendar | null = null;
     callback: UpdateViewCallback | null = null;
     private isNavigating = false;
+    private calendarEl: HTMLElement | null = null;
+
+    // Zoom state
+    private pinchStartDist = 0;
+    private initialSlotHeight = 0;
+    private currentZoomHeight = 0;
+    private zoomStartTimeOffset = 0;
+    private isZooming = false;
 
     constructor(
         leaf: WorkspaceLeaf,
@@ -80,6 +88,16 @@ export class CalendarView extends ItemView {
 
     getDisplayText() {
         return this.inSidebar ? "Full Calendar" : "Calendar";
+    }
+
+    refreshSlotHeight(height: number) {
+        if (this.fullCalendarView) {
+            this.containerEl.style.setProperty(
+                "--fc-slot-min-height",
+                `${height}px`
+            );
+            (this.fullCalendarView as any).setOption("slotMinHeight", height);
+        }
     }
 
     translateSources() {
@@ -108,6 +126,7 @@ export class CalendarView extends ItemView {
         const container = this.containerEl.children[1];
         container.empty();
         let calendarEl = container.createEl("div");
+        this.calendarEl = calendarEl;
 
         if (
             this.plugin.settings.calendarSources.filter(
@@ -119,6 +138,43 @@ export class CalendarView extends ItemView {
         }
 
         const sources: EventSourceInput[] = this.translateSources();
+
+        // Set the slot height from settings
+        document.body.style.setProperty(
+            "--fc-slot-min-height",
+            `${this.plugin.settings.timeSlotHeight}px`
+        );
+
+        // Attach Zoom Listeners using Obsidian's registration for safety
+        this.registerDomEvent(this.containerEl, "wheel", this.handleWheel, {
+            passive: false,
+            capture: true,
+        });
+        this.registerDomEvent(
+            this.containerEl,
+            "touchstart",
+            this.handleTouchStart,
+            {
+                capture: true,
+            }
+        );
+        this.registerDomEvent(
+            this.containerEl,
+            "touchmove",
+            this.handleTouchMove,
+            {
+                passive: false,
+                capture: true,
+            }
+        );
+        this.registerDomEvent(
+            this.containerEl,
+            "touchend",
+            this.handleTouchEnd,
+            {
+                capture: true,
+            }
+        );
 
         if (this.fullCalendarView) {
             this.fullCalendarView.destroy();
@@ -422,7 +478,243 @@ export class CalendarView extends ItemView {
         }
     }
 
+    private getScroller(): HTMLElement | null {
+        const scroller = this.containerEl
+            .querySelector(".fc-timegrid-body")
+            ?.closest(".fc-scroller") as HTMLElement;
+        if (!scroller) {
+            console.warn("Full Calendar: TimeGrid scroller not found");
+        }
+        return scroller;
+    }
+
+    private getTimeOffset(scroller: HTMLElement): number {
+        const slots = scroller.querySelector(
+            ".fc-timegrid-slots"
+        ) as HTMLElement;
+        if (!slots) {
+            console.warn(
+                "Full Calendar: Slots NOT FOUND in scroller",
+                scroller
+            );
+            return 0;
+        }
+        const totalHeight = slots.offsetHeight;
+        const scrollTop = scroller.scrollTop;
+        const viewportCenter = scrollTop + scroller.offsetHeight / 2;
+        const offset = viewportCenter / totalHeight;
+        console.log("Full Calendar: Offset Calc", {
+            scrollTop,
+            totalHeight,
+            offset,
+        });
+        return offset;
+    }
+
+    private setTimeOffset(scroller: HTMLElement, offset: number) {
+        // Always re-fetch the scroller from the container to avoid stale elements on mobile re-renders
+        const activeScroller = this.getScroller();
+        if (!activeScroller) return;
+
+        const slots = activeScroller.querySelector(
+            ".fc-timegrid-slots"
+        ) as HTMLElement;
+        if (!slots) return;
+        const totalHeight = slots.offsetHeight;
+        const viewportCenter = offset * totalHeight;
+        activeScroller.scrollTop =
+            viewportCenter - activeScroller.offsetHeight / 2;
+    }
+
+    private handleWheel = (e: WheelEvent) => {
+        if (!e.ctrlKey || !this.fullCalendarView) return;
+        const view = this.fullCalendarView.view;
+        if (
+            view.type !== "timeGridWeek" &&
+            view.type !== "timeGridDay" &&
+            view.type !== "timeGrid3Days"
+        )
+            return;
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        const scroller = this.getScroller();
+        if (!scroller) return;
+
+        if (!this.isZooming) {
+            this.isZooming = true;
+            this.initialSlotHeight = this.plugin.settings.timeSlotHeight;
+            this.currentZoomHeight = this.initialSlotHeight;
+            this.zoomStartTimeOffset = this.getTimeOffset(scroller);
+            console.log("Full Calendar: Zoom Start", this.zoomStartTimeOffset);
+        }
+
+        const zoomFactor = Math.pow(1.5, -e.deltaY / 100);
+        this.currentZoomHeight = Math.min(
+            Math.max(20, this.currentZoomHeight * zoomFactor),
+            120
+        );
+
+        this.performZoom(this.currentZoomHeight, scroller);
+
+        // Finalize after a short delay of no wheel events
+        clearTimeout((this as any).zoomTimeout);
+        (this as any).zoomTimeout = setTimeout(
+            () => this.finalizeZoom(scroller),
+            150
+        );
+    };
+
+    private handleTouchStart = (e: TouchEvent) => {
+        if (e.touches.length !== 2 || !this.fullCalendarView) return;
+        const view = this.fullCalendarView.view;
+        if (
+            view.type !== "timeGridWeek" &&
+            view.type !== "timeGridDay" &&
+            view.type !== "timeGrid3Days"
+        )
+            return;
+
+        const scroller = this.getScroller();
+        if (!scroller) return;
+
+        this.isZooming = true;
+        this.initialSlotHeight = this.plugin.settings.timeSlotHeight;
+        this.currentZoomHeight = this.initialSlotHeight;
+        this.zoomStartTimeOffset = this.getTimeOffset(scroller);
+        this.pinchStartDist = Math.hypot(
+            e.touches[0].pageX - e.touches[1].pageX,
+            e.touches[0].pageY - e.touches[1].pageY
+        );
+        console.log(
+            "Full Calendar: Touch Zoom Start",
+            this.zoomStartTimeOffset
+        );
+    };
+
+    private handleTouchMove = (e: TouchEvent) => {
+        if (!this.isZooming || e.touches.length !== 2) return;
+        e.preventDefault();
+
+        const scroller = this.getScroller();
+        if (!scroller) return;
+
+        const dist = Math.hypot(
+            e.touches[0].pageX - e.touches[1].pageX,
+            e.touches[0].pageY - e.touches[1].pageY
+        );
+        const zoomFactor = dist / this.pinchStartDist;
+        this.currentZoomHeight = Math.min(
+            Math.max(20, this.initialSlotHeight * zoomFactor),
+            120
+        );
+
+        this.performZoom(this.currentZoomHeight, scroller);
+    };
+
+    private handleTouchEnd = (e: TouchEvent) => {
+        if (!this.isZooming) return;
+
+        // If one finger is still down, don't finalize yet.
+        // This prevents the "jump" when fingers are lifted at slightly different times.
+        if (e.touches.length > 0) return;
+
+        const scroller = this.getScroller();
+        if (!scroller) {
+            this.isZooming = false;
+            return;
+        }
+
+        // Add a small delay to ensure the OS touch-system has settled
+        clearTimeout((this as any).touchFinalizeTimeout);
+        (this as any).touchFinalizeTimeout = setTimeout(() => {
+            if (this.isZooming) {
+                this.finalizeZoom(scroller);
+            }
+        }, 80);
+    };
+
+    private performZoom(newHeight: number, scroller: HTMLElement) {
+        requestAnimationFrame(() => {
+            const scale = newHeight / this.initialSlotHeight;
+            this.containerEl.style.setProperty(
+                "--zoom-scale",
+                scale.toString()
+            );
+            this.containerEl.style.setProperty(
+                "--fc-slot-min-height",
+                `${newHeight}px`
+            );
+            this.setTimeOffset(scroller, this.zoomStartTimeOffset);
+        });
+    }
+
+    private async finalizeZoom(scroller: HTMLElement) {
+        if (!this.isZooming) return;
+        const finalOffset = this.getTimeOffset(scroller);
+        const finalHeight = this.currentZoomHeight;
+
+        console.log("Full Calendar: FINALIZING", { finalHeight, finalOffset });
+
+        // 1. Update the internal settings
+        this.plugin.settings.timeSlotHeight = finalHeight;
+
+        // 2. Clear the temporary transform and set the new physical height
+        // We do this BEFORE calling FC updates so it measures the "clean" state.
+        this.containerEl.style.setProperty("--zoom-scale", "1");
+        this.containerEl.style.setProperty(
+            "--fc-slot-min-height",
+            `${finalHeight}px`
+        );
+        document.body.style.setProperty(
+            "--fc-slot-min-height",
+            `${finalHeight}px`
+        );
+
+        // 3. Force FullCalendar to recalculate its internal coordinate system
+        if (this.fullCalendarView) {
+            (this.fullCalendarView as any).setOption(
+                "slotMinHeight",
+                finalHeight
+            );
+        }
+
+        // 4. Mobile Stabilization: Perform a triple-pass layout update.
+        // We use a small delay between updates to ensure the DOM layout cache is invalidated.
+        requestAnimationFrame(() => {
+            if (this.fullCalendarView) {
+                this.fullCalendarView.updateSize();
+            }
+            setTimeout(() => {
+                requestAnimationFrame(() => {
+                    if (this.fullCalendarView) {
+                        this.fullCalendarView.render();
+                    }
+                    this.setTimeOffset(scroller, finalOffset);
+                    this.isZooming = false;
+                    console.log("Full Calendar: Zoom Stabilized", finalOffset);
+                });
+            }, 50); // 50ms is enough for most mobile browsers to settle
+        });
+    }
     async onunload() {
+        if (this.calendarEl) {
+            this.calendarEl.removeEventListener("wheel", this.handleWheel);
+            this.calendarEl.removeEventListener(
+                "touchstart",
+                this.handleTouchStart
+            );
+            this.calendarEl.removeEventListener(
+                "touchmove",
+                this.handleTouchMove
+            );
+            this.calendarEl.removeEventListener(
+                "touchend",
+                this.handleTouchEnd
+            );
+        }
+
         if (this.fullCalendarView) {
             this.fullCalendarView.destroy();
             this.fullCalendarView = null;

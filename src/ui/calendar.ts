@@ -124,30 +124,33 @@ export function renderCalendar(
             (isNarrow ? "timeGrid3Days" : "timeGridWeek"),
         nowIndicator: true,
         scrollTimeReset: false,
-        dayMaxEvents: true,
+        dayMaxEvents: isMobile ? 6 : true,
 
-        headerToolbar: !isNarrow
+        headerToolbar: isMobile
+            ? {
+                  left: "title",
+                  right: "prev,next",
+              }
+            : !isNarrow
             ? {
                   left: "prev,next today",
                   center: "title",
                   right: "dayGridMonth,timeGridWeek,timeGridDay,listWeek",
               }
-            : !isMobile
-            ? {
+            : {
                   right: "today,prev,next",
                   left: "timeGrid3Days,timeGridDay,listWeek",
-              }
-            : false,
+              },
         footerToolbar: isMobile
             ? {
-                  right: "today,prev,next",
-                  left: "dayGridMonth,timeGrid3Days,timeGridDay,listWeek",
+                  center: "dayGridMonth,timeGrid3Days,timeGridDay,listWeek today",
               }
             : false,
 
         views: {
             dayGridMonth: {
                 buttonText: isNarrow ? "M" : "month",
+                dayMaxEvents: isMobile ? 12 : true,
             },
             timeGridDay: {
                 type: "timeGrid",
@@ -158,6 +161,9 @@ export function renderCalendar(
                 type: "timeGrid",
                 duration: { days: 3 },
                 buttonText: "3",
+            },
+            listWeek: {
+                buttonText: isNarrow ? "L" : "list",
             },
         },
         firstDay: settings?.firstDay,
@@ -241,6 +247,20 @@ export function renderCalendar(
         editable: modifyEvent && true,
         eventDrop: modifyEventCallback,
         eventResize: modifyEventCallback,
+
+        eventContent: (arg) => {
+            const isMobile = window.innerWidth < 500;
+            const isMonthView = arg.view.type === "dayGridMonth";
+
+            if (isMobile && isMonthView) {
+                const dot = document.createElement("div");
+                dot.addClass("ofc-mobile-dot");
+                dot.style.backgroundColor =
+                    arg.event.backgroundColor || "var(--interactive-accent)";
+                return { domNodes: [dot] };
+            }
+            return undefined;
+        },
 
         eventDidMount: ({ event, el, textColor }) => {
             el.addEventListener("contextmenu", (e) => {

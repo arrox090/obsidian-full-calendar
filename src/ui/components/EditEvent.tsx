@@ -110,7 +110,7 @@ export const EditEvent = ({
     const recurrenceRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        if (titleRef.current) {
+        if (titleRef.current && window.innerWidth >= 500) {
             titleRef.current.focus();
         }
     }, [titleRef]);

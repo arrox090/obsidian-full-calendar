@@ -292,9 +292,14 @@ export default class FullCalendarPlugin extends Plugin {
         );
     }
 
-    async saveSettings() {
-        new Notice("Resetting the event cache with new settings...");
+    async saveSettings(skipReset = false, quiet = false) {
+        if (!quiet) {
+            new Notice("Resetting the event cache with new settings...");
+        }
         await this.saveData(this.settings);
+        if (skipReset) {
+            return;
+        }
         this.cache.reset(this.settings.calendarSources);
         await this.cache.populate();
         this.cache.resync();

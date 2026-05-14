@@ -1,8 +1,10 @@
 .is-phone .fc {
-	height: calc(100% - 4rem);
+	height: 100%;
 }
 .fc {
 	height: 100%;
+	display: flex;
+	flex-direction: column;
 	--fc-button-text-color: var(--text-normal);
 	--fc-button-bg-color: var(--interactive-normal);
 	--fc-button-border-color: var(--interactive-normal);
@@ -18,7 +20,6 @@
 	--fc-event-text-color: var(--text-on-accent);
 
 	--fc-list-event-hover-bg-color: var(--background-secondary);
-	--fc-neutral-bg-color: var(--background-primary-alt);
 
 	--fc-page-bg-color: var(--background-primary);
 	--fc-border-color: var(--background-modifier-border);
@@ -36,6 +37,67 @@
 	--fc-highlight-color: var(--text-highlight-bg);
 	--fc-bg-event-color: var(--background-modifier-success);
 	--fc-non-business-color: var(--background-modifier-box-shadow);
+}
+
+/* 
+ * Smooth Zoom Support:
+ * 1. .fc-timegrid-slot height is resized via --fc-slot-min-height.
+ * 2. .fc-timegrid-col-events and .fc-timegrid-bg are scaled via --zoom-scale.
+ * 
+ * Stacking Order Fix:
+ * To show lines ON TOP of the today background but BEHIND events,
+ * we must avoid a stacking context on the parent (.fc-timegrid-cols).
+ */
+
+.fc .fc-timegrid-slot {
+	height: var(--fc-slot-min-height, 40px) !important;
+}
+
+.fc-timegrid-slots {
+	position: relative;
+	z-index: 2 !important; /* Above Today BG (1) */
+	transform: translateZ(0);
+	background: transparent !important;
+	pointer-events: none; /* Let clicks pass through to columns */
+}
+
+/* Today highlight background */
+.fc-timegrid-bg-harness, .fc-timegrid-bg {
+	position: relative;
+	z-index: 1 !important; /* Below Lines (2) */
+	transform: scaleY(var(--zoom-scale, 1)) translateZ(0);
+	transform-origin: top;
+}
+
+/* The container for events must NOT have a z-index or it traps children */
+.fc-timegrid-cols {
+	position: relative;
+	z-index: auto !important; 
+	transform: none !important;
+}
+
+/* Individual event container scaling */
+.fc-timegrid-col-events {
+	position: relative;
+	z-index: 3 !important; /* Above Lines (2) */
+	transform: scaleY(var(--zoom-scale, 1)) translateZ(0);
+	transform-origin: top;
+	transition: none;
+}
+
+/* Ensure today's background color is applied */
+.fc .fc-today-bg-color {
+	background-color: var(--background-modifier-cover);
+}
+
+/* Prevent text/icon distortion inside events */
+.fc-event-main {
+	transform: scaleY(calc(1 / var(--zoom-scale, 1)));
+	transform-origin: top;
+}
+
+.fc-timegrid-body {
+	isolation: isolate;
 }
 
 .fc a {
@@ -121,4 +183,98 @@
 /* Ensure container clips descriptions properly */
 .fc-event-main, .fc-list-event-title {
 	overflow: hidden !important;
+}
+
+/* Mobile Toolbar Alignment */
+@media (max-width: 500px) {
+	.fc {
+		height: calc(100% - 3rem) !important; 
+		overflow: hidden !important;
+		touch-action: none;
+	}
+
+	/* Force Month View to be non-scrollable and fit the screen */
+	.fc-daygrid-view, 
+	.fc-daygrid-view .fc-scroller,
+	.fc-daygrid-view .fc-scroller-harness {
+		overflow: hidden !important;
+		height: 100% !important;
+	}
+
+	.fc-daygrid-body, .fc-daygrid-container, .fc-daygrid-view .fc-view-harness {
+		height: 100% !important;
+		width: 100% !important;
+	}
+
+	.fc .fc-toolbar {
+		display: flex !important;
+		justify-content: space-between !important;
+		align-items: center !important;
+		padding: 4px 8px !important;
+		margin-bottom: 4px !important;
+	}
+
+	.fc-toolbar-title {
+		font-size: 1.1em !important;
+		font-weight: bold;
+	}
+
+	.fc-footer-toolbar {
+		display: flex !important;
+		justify-content: center !important;
+		gap: 8px;
+		padding-top: 8px !important;
+		padding-bottom: env(safe-area-inset-bottom, 12px) !important;
+		background: var(--background-primary);
+		border-top: 1px solid var(--background-modifier-border);
+		box-shadow: 0 -4px 12px rgba(0,0,0,0.15);
+	}
+
+	/* JS-based Mobile Dots (Month View) */
+	.ofc-mobile-dot {
+		width: 5px;
+		height: 5px;
+		border-radius: 50%;
+		display: inline-block;
+		margin: 1px;
+		pointer-events: none !important;
+	}
+
+	.fc-daygrid-view .fc-daygrid-event {
+		pointer-events: none !important;
+		background: transparent !important;
+		border: none !important;
+		box-shadow: none !important;
+		display: inline-block !important;
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	/* Center dots in Month view cells */
+	.fc-daygrid-day-events {
+		display: flex !important;
+		flex-wrap: wrap !important;
+		justify-content: center !important;
+		align-items: center !important;
+		min-height: 12px !important;
+		padding: 2px !important;
+	}
+
+	/* Style the "more" link to be compact */
+	.fc-daygrid-more-link {
+		position: absolute !important;
+		bottom: 2px !important;
+		left: 50% !important;
+		transform: translateX(-50%) !important;
+		font-size: 0.65em !important;
+		padding: 0 2px !important;
+		background: var(--background-primary) !important;
+		border-radius: 4px !important;
+	}
+
+	/* Prevent buttons from growing too large and breaking the line */
+	.fc .fc-button {
+		padding: 4px 8px !important;
+		font-size: 0.9em !important;
+	}
 }

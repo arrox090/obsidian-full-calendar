@@ -16,6 +16,11 @@ import { createElement } from "react";
 import { getDailyNoteSettings } from "obsidian-daily-notes-interface";
 import ReactModal from "./ReactModal";
 import { importCalendars } from "src/calendars/parsing/caldav/import";
+import {
+    CalendarView,
+    FULL_CALENDAR_SIDEBAR_VIEW_TYPE,
+    FULL_CALENDAR_VIEW_TYPE,
+} from "./view";
 
 export interface FullCalendarSettings {
     calendarSources: CalendarInfo[];
@@ -27,6 +32,7 @@ export interface FullCalendarSettings {
     };
     timeFormat24h: boolean;
     clickToCreateEventFromMonthView: boolean;
+    timeSlotHeight: number;
 }
 
 export const DEFAULT_SETTINGS: FullCalendarSettings = {
@@ -39,6 +45,7 @@ export const DEFAULT_SETTINGS: FullCalendarSettings = {
     },
     timeFormat24h: false,
     clickToCreateEventFromMonthView: true,
+    timeSlotHeight: 40,
 };
 
 const WEEKDAYS = [
@@ -245,6 +252,42 @@ export class FullCalendarSettingTab extends PluginSettingTab {
                     this.plugin.settings.clickToCreateEventFromMonthView = val;
                     await this.plugin.saveSettings();
                 });
+            });
+
+        new Setting(containerEl)
+            .setName("Time slot height")
+            .setDesc(
+                "Adjust the height of hour lines in weekly and daily views."
+            )
+            .addSlider((slider) => {
+                slider
+                    .setLimits(20, 120, 5)
+                    .setValue(this.plugin.settings.timeSlotHeight)
+                    .setDynamicTooltip()
+                    .onChange(async (value) => {
+                        this.plugin.settings.timeSlotHeight = value;
+                        await this.plugin.saveSettings(true, true);
+                        // Dynamically update all active calendar views
+                        this.app.workspace
+                            .getLeavesOfType(FULL_CALENDAR_VIEW_TYPE)
+                            .forEach((leaf) => {
+                                if (leaf.view instanceof CalendarView) {
+                                    leaf.view.refreshSlotHeight(value);
+                                }
+                            });
+                        this.app.workspace
+                            .getLeavesOfType(FULL_CALENDAR_SIDEBAR_VIEW_TYPE)
+                            .forEach((leaf) => {
+                                if (leaf.view instanceof CalendarView) {
+                                    leaf.view.refreshSlotHeight(value);
+                                }
+                            });
+
+                        document.body.style.setProperty(
+                            "--fc-slot-min-height",
+                            `${value}px`
+                        );
+                    });
             });
 
         containerEl.createEl("h2", { text: "Manage Calendars" });
