@@ -181,6 +181,17 @@ export function renderCalendar(
         }),
         eventSources,
         eventClick: (info) => {
+            const isMobile = window.innerWidth < 500;
+            const isMonthView = info.view.type === "dayGridMonth";
+
+            if (isMobile && isMonthView) {
+                if (info.event.start) {
+                    info.view.calendar.gotoDate(info.event.start);
+                    info.view.calendar.changeView("timeGridDay");
+                }
+                return;
+            }
+
             if (eventDblClick) {
                 if (clickTimeout) {
                     clearTimeout(clickTimeout);
@@ -256,7 +267,7 @@ export function renderCalendar(
                 const dot = document.createElement("div");
                 dot.addClass("ofc-mobile-dot");
                 dot.style.backgroundColor =
-                    arg.event.backgroundColor || "var(--interactive-accent)";
+                    arg.backgroundColor || "var(--interactive-accent)";
                 return { domNodes: [dot] };
             }
             return undefined;

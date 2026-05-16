@@ -231,23 +231,40 @@
 	}
 
 	/* JS-based Mobile Dots (Month View) */
+	.fc-daygrid-view .fc-daygrid-event-harness,
+	.fc-daygrid-view .fc-daygrid-event,
+	.fc-daygrid-view .fc-event,
+	.fc-daygrid-view .fc-event-main,
+	.ofc-mobile-dot {
+		pointer-events: none !important;
+	}
+
 	.ofc-mobile-dot {
 		width: 5px;
 		height: 5px;
 		border-radius: 50%;
 		display: inline-block;
 		margin: 1px;
-		pointer-events: none !important;
 	}
 
 	.fc-daygrid-view .fc-daygrid-event {
-		pointer-events: none !important;
 		background: transparent !important;
 		border: none !important;
 		box-shadow: none !important;
 		display: inline-block !important;
 		margin: 0 !important;
 		padding: 0 !important;
+	}
+
+	.fc-daygrid-view .fc-daygrid-event:active,
+	.fc-daygrid-view .fc-daygrid-event:hover {
+		background: transparent !important;
+		box-shadow: none !important;
+	}
+
+	.ofc-mobile-dot:active,
+	.ofc-mobile-dot:hover {
+		outline: none !important;
 	}
 
 	/* Center dots in Month view cells */
