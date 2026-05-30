@@ -152,6 +152,8 @@ export function renderCalendar(
             dayGridMonth: {
                 buttonText: isNarrow ? "M" : "month",
                 dayMaxEvents: isMobile ? 12 : true,
+                eventStartEditable: !isMobile,
+                eventDurationEditable: !isMobile,
             },
             timeGridDay: {
                 type: "timeGrid",
