@@ -1,6 +1,6 @@
 {
 "name": "obsidian-full-calendar-extended",
-"version": "0.2.3-extended",
+"version": "0.2.4-extended",
 "description": "An enhanced 'Full Calendar' for Obsidian with natural language recurrence (e.g. 'every 2 weeks') and robust Daily Note task synchronization.",
 "main": "main.js",
 "scripts": {

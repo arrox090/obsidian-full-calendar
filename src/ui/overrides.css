@@ -191,6 +191,7 @@
 		height: calc(100% - 3rem) !important; 
 		overflow: hidden !important;
 		touch-action: none;
+		-webkit-tap-highlight-color: transparent;
 	}
 
 	/* Force Month View to be non-scrollable and fit the screen */

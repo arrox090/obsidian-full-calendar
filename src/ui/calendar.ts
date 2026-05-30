@@ -182,6 +182,15 @@ export function renderCalendar(
         }),
         eventSources,
         eventClick: (info) => {
+            const isMobile = window.innerWidth < 500;
+            const isMonthView = info.view.type === "dayGridMonth";
+
+            // On mobile month view, dots should be completely non-interactive.
+            // Returning early here prevents the edit modal from opening.
+            if (isMobile && isMonthView) {
+                return;
+            }
+
             if (eventDblClick) {
                 if (clickTimeout) {
                     clearTimeout(clickTimeout);
