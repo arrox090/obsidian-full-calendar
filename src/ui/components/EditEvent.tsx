@@ -35,19 +35,19 @@ export const EditEvent = ({
 }: EditEventProps) => {
     const [date, setDate] = useState(
         initialEvent
-            ? initialEvent.type === "single"
-                ? initialEvent.date
-                : initialEvent.type === "recurring"
-                ? initialEvent.startRecur
-                : initialEvent.type === "rrule"
-                ? initialEvent.startDate
-                : ""
+            ? (initialEvent.type === "single"
+                  ? initialEvent.date
+                  : initialEvent.type === "recurring"
+                  ? initialEvent.startRecur
+                  : initialEvent.type === "rrule"
+                  ? initialEvent.startDate
+                  : "") || ""
             : ""
     );
     const [endDate, setEndDate] = useState(
-        initialEvent && initialEvent.type === "single"
+        (initialEvent && initialEvent.type === "single"
             ? initialEvent.endDate
-            : undefined
+            : undefined) || undefined
     );
 
     let initialStartTime = "";
@@ -68,7 +68,9 @@ export const EditEvent = ({
     const [isRecurring, setIsRecurring] = useState(
         initialEvent?.type === "recurring" || false
     );
-    const [endRecur, setEndRecur] = useState("");
+    const [endRecur, setEndRecur] = useState(
+        (initialEvent?.type === "recurring" ? initialEvent.endRecur : "") || ""
+    );
 
     const [recurrenceString, setRecurrenceString] = useState<string>(
         (initialEvent?.type === "recurring" ? initialEvent.recurrence : "") ||

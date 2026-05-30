@@ -199,6 +199,23 @@ export class CalendarView extends ItemView {
             dateClick: async (info) => {
                 if (this.isNavigating) return;
                 if (info.view.type === "dayGridMonth") {
+                    if (this.plugin.settings.clickToCreateEventFromMonthView) {
+                        const partialEvent = dateEndpointsToFrontmatter(
+                            info.date,
+                            info.date,
+                            info.allDay
+                        );
+                        try {
+                            launchCreateModal(this.plugin, partialEvent);
+                        } catch (e) {
+                            if (e instanceof Error) {
+                                console.error(e);
+                                new Notice(e.message);
+                            }
+                        }
+                        return;
+                    }
+
                     this.isNavigating = true;
                     this.fullCalendarView?.changeView("timeGridDay");
                     this.fullCalendarView?.gotoDate(info.date);
@@ -687,13 +704,14 @@ export class CalendarView extends ItemView {
                 this.fullCalendarView.updateSize();
             }
             setTimeout(() => {
-                requestAnimationFrame(() => {
+                requestAnimationFrame(async () => {
                     if (this.fullCalendarView) {
                         this.fullCalendarView.render();
                     }
                     this.setTimeOffset(scroller, finalOffset);
                     this.isZooming = false;
                     console.log("Full Calendar: Zoom Stabilized", finalOffset);
+                    await this.plugin.saveSettings(true, true);
                 });
             }, 50); // 50ms is enough for most mobile browsers to settle
         });

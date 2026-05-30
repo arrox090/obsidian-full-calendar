@@ -82,6 +82,7 @@ export function renderCalendar(
         eventMouseEnter,
         openContextMenuForEvent,
         toggleTask,
+        timeFormat24h,
     } = settings || {};
 
     let clickTimeout: any = null;
@@ -181,17 +182,6 @@ export function renderCalendar(
         }),
         eventSources,
         eventClick: (info) => {
-            const isMobile = window.innerWidth < 500;
-            const isMonthView = info.view.type === "dayGridMonth";
-
-            if (isMobile && isMonthView) {
-                if (info.event.start) {
-                    info.view.calendar.gotoDate(info.event.start);
-                    info.view.calendar.changeView("timeGridDay");
-                }
-                return;
-            }
-
             if (eventDblClick) {
                 if (clickTimeout) {
                     clearTimeout(clickTimeout);
@@ -286,9 +276,11 @@ export function renderCalendar(
                 : `${event.start?.toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
+                      hour12: !timeFormat24h,
                   })} - ${event.end?.toLocaleTimeString([], {
                       hour: "2-digit",
                       minute: "2-digit",
+                      hour12: !timeFormat24h,
                   })}`;
 
             el.title = `📌 ${event.title}\n⏰ ${timeStr}${
@@ -303,7 +295,7 @@ export function renderCalendar(
                 el.closest(".fc-daygrid-event") !== null ||
                 el.classList.contains("fc-daygrid-event");
 
-            if (titleEl && !isDayGrid) {
+            if (titleEl && !isDayGrid && description) {
                 const descEl = document.createElement("div");
                 descEl.addClass("ofc-event-description");
                 descEl.innerText = description;

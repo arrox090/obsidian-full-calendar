@@ -67,7 +67,7 @@ function replaceFrontmatter(page: string, newFrontmatter: string): string {
     return `---\n${newFrontmatter}---${extractPageContents(page)}`;
 }
 
-type PrintableAtom = Array<number | string> | number | string | boolean;
+type PrintableAtom = Array<number | string> | number | string | boolean | null;
 
 function stringifyYamlAtom(v: PrintableAtom): string {
     let result = "";

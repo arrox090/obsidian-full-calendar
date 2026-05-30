@@ -235,6 +235,7 @@
 	.fc-daygrid-view .fc-daygrid-event,
 	.fc-daygrid-view .fc-event,
 	.fc-daygrid-view .fc-event-main,
+	.fc-daygrid-view a.fc-daygrid-event,
 	.ofc-mobile-dot {
 		pointer-events: none !important;
 	}

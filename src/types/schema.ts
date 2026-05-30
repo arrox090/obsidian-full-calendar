@@ -60,8 +60,8 @@ export const TimeSchema = z.discriminatedUnion("allDay", [
 
 export const CommonSchema = z.object({
     title: z.string(),
-    id: z.string().optional(),
-    description: z.string().optional(),
+    id: z.string().nullable().optional(),
+    description: z.string().nullable().optional(),
 });
 
 export const EventSchema = z.discriminatedUnion("type", [
@@ -76,8 +76,8 @@ export const EventSchema = z.discriminatedUnion("type", [
     z.object({
         type: z.literal("recurring"),
         recurrence: z.string(),
-        startRecur: ParsedDate.optional(),
-        endRecur: ParsedDate.optional(),
+        startRecur: ParsedDate.nullable().optional(),
+        endRecur: ParsedDate.nullable().optional(),
         completed: ParsedDate.or(z.literal(false))
             .or(z.literal(null))
             .optional(),
@@ -106,7 +106,7 @@ export function parseEvent(obj: unknown): OFCEvent {
         type: "single",
         allDay: false,
         ...anyObj,
-        ...(description !== undefined ? { description } : {}),
+        description,
     };
     return {
         ...CommonSchema.parse(objectWithDefaults),
