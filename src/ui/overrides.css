@@ -232,52 +232,43 @@
 	}
 
 	/* JS-based Mobile Dots (Month View) */
-	.fc-daygrid-view .fc-daygrid-event-harness,
-	.fc-daygrid-view .fc-daygrid-event,
-	.fc-daygrid-view .fc-event,
-	.fc-daygrid-view .fc-event-main,
+	/* 
+	 * Mobile Month View: "Painted Objects" Implementation
+	 * We use display: contents to effectively remove the event's box from the DOM.
+	 * This prevents any background highlights, borders, or tap feedback.
+	 */
 	.fc-daygrid-view a.fc-daygrid-event,
-	.ofc-mobile-dot {
+	.fc-daygrid-view .fc-daygrid-event,
+	.fc-daygrid-view .fc-daygrid-event-harness,
+	.fc-daygrid-view .fc-event,
+	.fc-daygrid-view .fc-event-main {
+		display: contents !important;
+		background: none !important;
+		border: none !important;
+		box-shadow: none !important;
+		outline: none !important;
 		pointer-events: none !important;
-		user-select: none !important;
-		-webkit-user-select: none !important;
+		-webkit-tap-highlight-color: transparent !important;
+	}
+
+	/* Disable ANY visual state change for children of events */
+	.fc-daygrid-view .fc-daygrid-event *,
+	.fc-daygrid-view .fc-event * {
+		outline: none !important;
+		box-shadow: none !important;
+		-webkit-tap-highlight-color: transparent !important;
+		background: none !important;
 	}
 
 	.ofc-mobile-dot {
 		width: 5px;
 		height: 5px;
 		border-radius: 50%;
-		display: inline-block;
-		margin: 1px;
-	}
-
-	/* Disable ANY visual state change for events in month view */
-	.fc-daygrid-view .fc-daygrid-event,
-	.fc-daygrid-view .fc-daygrid-event *,
-	.fc-daygrid-view .fc-event,
-	.fc-daygrid-view .fc-event * {
-		outline: none !important;
-		box-shadow: none !important;
-		-webkit-tap-highlight-color: transparent !important;
-	}
-
-	.fc-daygrid-view .fc-daygrid-event:active,
-	.fc-daygrid-view .fc-daygrid-event:focus,
-	.fc-daygrid-view .fc-daygrid-event:hover,
-	.fc-daygrid-view .fc-daygrid-event.fc-event-selected,
-	.fc-daygrid-view .fc-daygrid-event.fc-event-mirror {
-		background: transparent !important;
-		opacity: 1 !important;
-		border: none !important;
-	}
-
-	.fc-daygrid-view .fc-daygrid-event {
-		background: transparent !important;
-		border: none !important;
-		box-shadow: none !important;
 		display: inline-block !important;
-		margin: 0 !important;
-		padding: 0 !important;
+		margin: 1px;
+		/* Ensure dots ARE visible despite parent stripping */
+		visibility: visible !important;
+		opacity: 1 !important;
 	}
 
 	/* Center dots in Month view cells */
