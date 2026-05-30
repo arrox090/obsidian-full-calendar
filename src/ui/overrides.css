@@ -191,7 +191,11 @@
 		height: calc(100% - 3rem) !important; 
 		overflow: hidden !important;
 		touch-action: none;
-		-webkit-tap-highlight-color: transparent;
+		-webkit-tap-highlight-color: transparent !important;
+	}
+
+	.fc * {
+		-webkit-tap-highlight-color: transparent !important;
 	}
 
 	/* Force Month View to be non-scrollable and fit the screen */
@@ -231,44 +235,39 @@
 		box-shadow: 0 -4px 12px rgba(0,0,0,0.15);
 	}
 
-	/* JS-based Mobile Dots (Month View) */
 	/* 
-	 * Mobile Month View: "Painted Objects" Implementation
-	 * We use display: contents to effectively remove the event's box from the DOM.
-	 * This prevents any background highlights, borders, or tap feedback.
+	 * Mobile Month View: "Visibility Ghost" Implementation
+	 * We set visibility: hidden on the parent event elements.
+	 * This makes them completely non-interactive (no clicks, no highlights).
+	 * We then set visibility: visible on the dots so they still appear.
 	 */
-	.fc-daygrid-view a.fc-daygrid-event,
-	.fc-daygrid-view .fc-daygrid-event,
 	.fc-daygrid-view .fc-daygrid-event-harness,
+	.fc-daygrid-view .fc-daygrid-event-harness *,
+	.fc-daygrid-view .fc-daygrid-event,
+	.fc-daygrid-view .fc-daygrid-event *,
 	.fc-daygrid-view .fc-event,
-	.fc-daygrid-view .fc-event-main {
-		display: contents !important;
+	.fc-daygrid-view .fc-event * {
+		visibility: hidden !important;
 		background: none !important;
+		background-color: transparent !important;
 		border: none !important;
 		box-shadow: none !important;
 		outline: none !important;
 		pointer-events: none !important;
-		-webkit-tap-highlight-color: transparent !important;
+		user-select: none !important;
+		-webkit-user-select: none !important;
 	}
 
-	/* Disable ANY visual state change for children of events */
-	.fc-daygrid-view .fc-daygrid-event *,
-	.fc-daygrid-view .fc-event * {
-		outline: none !important;
-		box-shadow: none !important;
-		-webkit-tap-highlight-color: transparent !important;
-		background: none !important;
-	}
-
+	/* Force dots to be visible despite the broad reset above */
 	.ofc-mobile-dot {
-		width: 5px;
-		height: 5px;
-		border-radius: 50%;
-		display: inline-block !important;
-		margin: 1px;
-		/* Ensure dots ARE visible despite parent stripping */
 		visibility: visible !important;
+		width: 5px !important;
+		height: 5px !important;
+		border-radius: 50% !important;
+		display: inline-block !important;
+		margin: 1px !important;
 		opacity: 1 !important;
+		pointer-events: none !important;
 	}
 
 	/* Center dots in Month view cells */
@@ -277,16 +276,14 @@
 		flex-wrap: wrap !important;
 		justify-content: center !important;
 		align-items: center !important;
-		min-height: 12px !important;
-		padding: 2px !important;
+		min-height: 14px !important;
+		margin-bottom: 12px !important;
 	}
 
 	/* Style the "more" link to be compact */
 	.fc-daygrid-more-link {
-		position: absolute !important;
-		bottom: 2px !important;
-		left: 50% !important;
-		transform: translateX(-50%) !important;
+		visibility: visible !important;
+		pointer-events: auto !important;
 		font-size: 0.65em !important;
 		padding: 0 2px !important;
 		background: var(--background-primary) !important;

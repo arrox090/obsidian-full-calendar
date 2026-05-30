@@ -190,6 +190,8 @@ export function renderCalendar(
             // On mobile month view, dots should be completely non-interactive.
             // Returning early here prevents the edit modal from opening.
             if (isMobile && isMonthView) {
+                info.jsEvent.preventDefault();
+                info.jsEvent.stopPropagation();
                 return;
             }
 
